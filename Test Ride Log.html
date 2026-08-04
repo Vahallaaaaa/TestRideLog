@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Ride Log — 赛车测试日志</title>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --surface2: #111111;
+    --border: #2a2a2a;
+    --border2: #3a3a3a;
+    --text: #ffffff;
+    --text2: #909090;
+    --accent: #cc0000;
+    --accent-hover: #e60000;
+    --accent-dark: #800000;
+    --white: #ffffff;
+    --silver: #a8a8a8;
+    --green: #22c55e;
+    --red-err: #ef4444;
+    --radius: 3px;
+    --font: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px, rgba(255,255,255,0.003) 2px, rgba(255,255,255,0.003) 4px);
+    pointer-events: none; z-index: 0;
+  }
+  .main-container, .app-header { position: relative; z-index: 1; }
+
+  /* ===== Header ===== */
+  .app-header {
+    background: #000;
+    border-bottom: 3px solid var(--accent);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 20px rgba(204,0,0,0.15);
+  }
+  .app-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: 2px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-transform: uppercase;
+  }
+  .app-title .team-logo { height: 32px; width: auto; }
+  .app-title .title-text { display: flex; flex-direction: column; }
+  .app-title .title-text .main { font-size: 1.2rem; line-height: 1.1; }
+  .app-title .title-text .sub {
+    font-size: 0.6rem; color: var(--silver); font-weight: 400; letter-spacing: 1px;
+  }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    padding: 8px 18px;
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+    font-family: var(--font);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: 0 0 12px rgba(204,0,0,0.4); }
+  .btn-secondary { background: transparent; color: var(--silver); border-color: #444; }
+  .btn-secondary:hover { background: #1a1a1a; border-color: #666; color: #fff; }
+  .btn-green { background: transparent; border-color: var(--green); color: var(--green); }
+  .btn-green:hover { background: rgba(34,197,94,0.1); }
+  .btn-blue { background: transparent; border-color: #666; color: var(--silver); }
+  .btn-blue:hover { background: #1a1a1a; border-color: #888; color: #fff; }
+  .btn-red { background: transparent; border-color: var(--red-err); color: var(--red-err); }
+  .btn-red:hover { background: rgba(239,68,68,0.1); }
+  .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+  .btn-xs { padding: 3px 10px; font-size: 0.7rem; }
+  .btn-lg { padding: 14px 40px; font-size: 1.05rem; letter-spacing: 2px; }
+  .btn-lg:hover { box-shadow: 0 0 20px rgba(204,0,0,0.5); }
+
+  /* ===== Main Layout ===== */
+  .main-container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+  /* ===== Start Page ===== */
+  .start-wrapper {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(100vh - 70px); padding: 40px 20px;
+  }
+  .start-card {
+    background: #080808;
+    border: 1px solid #222;
+    padding: 56px 48px;
+    max-width: 500px; width: 100%; text-align: center;
+    position: relative;
+  }
+  .start-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent);
+  }
+  .start-card .start-icon { font-size: 3.5rem; margin-bottom: 16px; }
+  .start-card h2 {
+    font-size: 1.8rem; color: #fff; margin-bottom: 4px;
+    font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+  }
+  .start-card .start-subtitle {
+    font-size: 0.85rem; color: var(--silver); margin-bottom: 40px; letter-spacing: 1px;
+  }
+  .start-card .form-group { text-align: left; margin-bottom: 20px; }
+  .start-card .form-group label {
+    display: block; font-size: 0.75rem; font-weight: 500; color: var(--silver);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .start-card .form-group input {
+    width: 100%; background: #111; color: #fff;
+    border: 1px solid #333; padding: 12px 16px;
+    font-size: 1rem; font-family: var(--font);
+  }
+  .start-card .form-group input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(204,0,0,0.3);
+  }
+  .datetime-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 8px; }
+  .datetime-row select {
+    width: 100%; background: #111; color: #fff;
+    border: 1px solid #333; padding: 12px 6px;
+    font-size: 0.9rem; font-family: var(--font); text-align: center;
+  }
+  .datetime-row select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .start-actions { margin-top: 32px; }
+
+  /* Session info bar */
+  .session-bar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 20px; background: #080808;
+    border: 1px solid #222; border-left: 3px solid var(--accent);
+    margin-bottom: 20px; flex-wrap: wrap; font-size: 0.88rem;
+  }
+  .session-bar .sess-label { color: var(--silver); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 1px; }
+  .session-bar .sess-value { color: #fff; font-weight: 600; }
+
+  /* Log Navigator */
+  .log-nav {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px; padding: 12px 16px;
+    background: #080808; border: 1px solid #222; flex-wrap: wrap;
+  }
+  .log-nav .label { color: var(--silver); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+  .log-nav select {
+    background: #111; color: #fff; border: 1px solid #333;
+    padding: 8px 12px; font-size: 0.9rem; font-family: var(--font); min-width: 280px;
+  }
+  .log-nav .log-count { color: var(--silver); font-size: 0.8rem; margin-left: auto; }
+
+  /* ===== Form Card ===== */
+  .form-card {
+    background: #080808;
+    border: 1px solid #222;
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .form-card::after {
+    content: ''; position: absolute; bottom: 0; left: 32px; right: 32px;
+    height: 1px; background: linear-gradient(to right, transparent, #333, transparent);
+  }
+  .section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 12px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .section-title .dot { display: none; }
+
+  /* ===== Grid ===== */
+  .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 16px;
+  }
+  .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .form-row.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label {
+    font-size: 0.72rem; font-weight: 500; color: var(--silver);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .form-group .unit { font-size: 0.7rem; color: var(--silver); font-weight: 400; margin-left: 4px; }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    background: #111; color: #fff;
+    border: 1px solid #333; padding: 10px 14px;
+    font-size: 0.95rem; font-family: var(--font);
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .form-group input::placeholder { color: #444; }
+  .form-group textarea { resize: vertical; min-height: 70px; }
+  .form-group input[type="number"] { -moz-appearance: textfield; }
+  .form-group input[type="number"]::-webkit-inner-spin-button,
+  .form-group input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+  /* ===== TC / REG Toggle ===== */
+  .toggle-group { display: flex; align-items: center; gap: 12px; padding-top: 8px; }
+  .toggle-option {
+    display: flex; align-items: center; gap: 4px;
+    cursor: pointer; padding: 8px 24px;
+    border: 1px solid #333; background: #111;
+    font-size: 0.85rem; font-weight: 600;
+    transition: all 0.15s; user-select: none;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .toggle-option input[type="radio"] { display: none; }
+  .toggle-option.on { color: #666; }
+  .toggle-option.off { color: #666; }
+  .toggle-option.on.active { background: rgba(204,0,0,0.15); border-color: var(--accent); color: var(--accent-hover); }
+  .toggle-option.off.active { background: rgba(255,255,255,0.05); border-color: #666; color: #ccc; }
+
+  /* ===== Tire Block (unused now but keep refs) ===== */
+  .tire-block { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .tire-section { background: #111; border: 1px solid #222; padding: 20px; }
+
+  /* ===== Lap Times ===== */
+  .lap-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .lap-row { display: flex; align-items: center; gap: 10px; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .lap-row .lap-num {
+    font-size: 0.8rem; color: var(--accent); font-weight: 700; min-width: 42px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .lap-row input {
+    background: #111; color: #fff; border: 1px solid #333;
+    padding: 8px 14px; font-size: 0.95rem; font-family: var(--font); width: 160px;
+  }
+  .lap-row input:focus { outline: none; border-color: var(--accent); }
+  .lap-row .btn-remove-lap {
+    background: none; border: 1px solid transparent; color: #666;
+    cursor: pointer; font-size: 1.1rem; padding: 4px 8px;
+  }
+  .lap-row .btn-remove-lap:hover { background: rgba(204,0,0,0.15); border-color: var(--accent); color: var(--accent); }
+  .lap-summary {
+    display: flex; gap: 24px; margin-top: 8px; padding-top: 12px; border-top: 1px solid #222;
+  }
+  .lap-summary .summary-item { font-size: 0.82rem; color: var(--silver); text-transform: uppercase; letter-spacing: 0.5px; }
+  .lap-summary .summary-item strong { color: #fff; }
+
+  /* ===== Tread Depth Grid ===== */
+  .tread-grid { display: flex; flex-direction: column; gap: 8px; }
+  .tread-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: #0d0d0d; border: 1px solid #1a1a1a;
+  }
+  .tread-label {
+    font-size: 0.82rem; font-weight: 700; color: #fff; min-width: 64px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .tread-label-sm {
+    font-size: 0.65rem; color: var(--silver); text-transform: uppercase; min-width: 20px; text-align: center;
+  }
+  .tread-row input[type="number"] {
+    background: #111; color: #fff; border: 1px solid #333;
+    padding: 7px 8px; font-size: 0.85rem; font-family: var(--font); width: 80px; text-align: center;
+    -moz-appearance: textfield;
+  }
+  .tread-row input[type="number"]::-webkit-inner-spin-button,
+  .tread-row input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .tread-row input[type="number"]:focus { outline: none; border-color: var(--accent); }
+
+  /* ===== Damper Section ===== */
+  .damper-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .damper-col { background: #0d0d0d; border: 1px solid #1a1a1a; padding: 16px 18px; }
+  .damper-title {
+    font-size: 0.78rem; font-weight: 700; color: #fff;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #222;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* ===== Tire Dual Layout ===== */
+  .tire-dual {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  }
+  .tire-col {
+    min-width: 0;
+  }
+  .tire-col-title {
+    font-size: 0.85rem; font-weight: 700; color: #fff;
+    text-align: center; margin-bottom: 12px;
+    padding: 8px 0; border-bottom: 2px solid var(--accent);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* ===== Tire Visual ===== */
+  .tire-visual-wrap { text-align: center; margin-bottom: 8px; }
+  .tire-visual-wrap canvas {
+    max-width: 100%; height: auto;
+    background: #080808; border: 1px solid #222;
+  }
+  .tire-legend { display: none; }
+  .tire-inputs-compact { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 16px; }
+  .tire-input-group-compact {
+    background: #0d0d0d; border: 1px solid #222; padding: 14px 16px;
+  }
+  .tire-input-group-compact .tig-label {
+    font-size: 0.78rem; font-weight: 700; color: #fff;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .tire-input-group-compact .tig-row { display: flex; gap: 8px; align-items: flex-end; }
+  .tire-input-group-compact .tig-field { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .tire-input-group-compact .tig-field span { font-size: 0.65rem; color: var(--silver); text-transform: uppercase; letter-spacing: 0.5px; }
+  .tire-input-group-compact .tig-field input {
+    background: #111; color: #fff; border: 1px solid #333;
+    padding: 8px 10px; font-size: 0.9rem; font-family: var(--font); width: 100%;
+    -moz-appearance: textfield;
+  }
+  .tire-input-group-compact .tig-field input::-webkit-inner-spin-button,
+  .tire-input-group-compact .tig-field input::-webkit-outer-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .tire-input-group-compact .tig-field input:focus { outline: none; border-color: var(--accent); }
+  .tire-input-group-compact .tig-pressure { flex: 1; }
+
+  /* ===== New Log at bottom ===== */
+  .new-log-area {
+    text-align: center; padding: 28px;
+    border: 1px dashed #333; margin-top: 8px; transition: border-color 0.2s;
+  }
+  .new-log-area:hover { border-color: var(--accent); }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #111; border-left: 3px solid var(--green); color: #fff;
+    padding: 14px 20px; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;
+    z-index: 999; box-shadow: 0 4px 24px rgba(0,0,0,0.6); animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { transform: translateY(16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* ===== Responsive: Tablet (≤900px) ===== */
+  @media (max-width: 900px) {
+    .main-container { max-width: 100%; padding: 12px; }
+    .form-row.cols-4 { grid-template-columns: 1fr 1fr; }
+    .app-header { padding: 8px 14px; gap: 8px; }
+    .header-actions { gap: 4px; }
+    .header-actions .btn { font-size: 0.72rem; padding: 6px 10px; letter-spacing: 0; }
+  }
+
+  /* ===== Responsive: Phone (≤768px) ===== */
+  @media (max-width: 768px) {
+    /* Layout */
+    .main-container { padding: 8px; }
+    .form-card { padding: 16px 12px; margin-bottom: 12px; }
+    .form-card::after { left: 12px; right: 12px; }
+    .form-row.cols-2, .form-row.cols-3, .form-row.cols-4 { grid-template-columns: 1fr; }
+    .tire-block { grid-template-columns: 1fr; }
+
+    /* Header */
+    .app-header { padding: 8px 10px; }
+    .app-title { font-size: 0.85rem; gap: 6px; }
+    .app-title .team-logo { height: 22px; }
+    .app-title .title-text .main { font-size: 0.9rem; letter-spacing: 1px; }
+    .app-title .title-text .sub { font-size: 0.52rem; }
+    .header-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 3px; }
+    .header-actions .btn { font-size: 0.66rem; padding: 5px 8px; }
+    .header-actions .btn.btn-sm { font-size: 0.62rem; padding: 4px 6px; }
+
+    /* Start page */
+    .start-wrapper { padding: 20px 12px; min-height: auto; }
+    .start-card { padding: 32px 16px; max-width: 100%; }
+    .start-card h2 { font-size: 1.4rem; letter-spacing: 2px; }
+    .start-card .start-subtitle { font-size: 0.75rem; margin-bottom: 28px; }
+    .datetime-row { grid-template-columns: repeat(5, 1fr); gap: 3px; }
+    .datetime-row select { padding: 10px 1px; font-size: 0.7rem; }
+    .start-card .form-group input { padding: 10px 12px; font-size: 0.9rem; }
+    .start-actions { margin-top: 24px; }
+    .start-actions .btn-lg { padding: 12px 32px; font-size: 0.9rem; }
+
+    /* Session bar */
+    .session-bar { flex-direction: column; gap: 4px; align-items: flex-start; padding: 12px 14px; font-size: 0.8rem; }
+
+    /* Log nav */
+    .log-nav { flex-direction: column; gap: 6px; padding: 10px 12px; align-items: stretch; }
+    .log-nav select { min-width: 0; width: 100%; font-size: 0.82rem; }
+    .log-nav .log-count { margin-left: 0; font-size: 0.72rem; }
+
+    /* Form elements */
+    .form-group input, .form-group textarea, .form-group select { padding: 8px 10px; font-size: 0.85rem; }
+    .form-group label { font-size: 0.66rem; }
+    .section-title { font-size: 0.85rem; padding: 3px 0 3px 10px; margin-bottom: 16px; border-left-width: 2px; }
+
+    /* Toggles */
+    .toggle-group { gap: 6px; flex-wrap: wrap; }
+    .toggle-option { padding: 6px 12px; font-size: 0.75rem; }
+
+    /* Tread + Damper → stack on mobile */
+    .tread-row { flex-wrap: wrap; gap: 4px; padding: 6px 8px; }
+    .tread-label { font-size: 0.7rem; min-width: 48px; }
+    .tread-row input[type="number"] { width: 60px; font-size: 0.78rem; padding: 5px 4px; }
+    .damper-section { grid-template-columns: 1fr; gap: 10px; }
+    .damper-col { padding: 10px 12px; }
+    /* Tire dual → stack on mobile */
+    .tire-dual { grid-template-columns: 1fr; gap: 16px; }
+    /* Tire inputs */
+    .tire-inputs-compact { grid-template-columns: 1fr; gap: 8px; }
+    .tire-input-group-compact { padding: 10px 12px; }
+    .tire-input-group-compact .tig-label { font-size: 0.72rem; margin-bottom: 6px; }
+    .tire-input-group-compact .tig-row { flex-wrap: wrap; gap: 4px; }
+    .tire-input-group-compact .tig-field { flex: 1 1 55px; min-width: 48px; }
+    .tire-input-group-compact .tig-field span { font-size: 0.6rem; }
+    .tire-input-group-compact .tig-field input { padding: 8px 6px; font-size: 0.85rem; }
+    .tire-input-group-compact .tig-pressure { flex: 1; }
+
+    /* Lap times */
+    .lap-row input { width: 110px; font-size: 0.85rem; padding: 6px 10px; }
+    .lap-row .lap-num { font-size: 0.7rem; min-width: 36px; }
+    .lap-summary { flex-direction: column; gap: 4px; }
+    .lap-summary .summary-item { font-size: 0.74rem; }
+
+    /* New log area */
+    .new-log-area { padding: 20px 12px; }
+    .new-log-area .btn-lg { padding: 12px 24px; font-size: 0.85rem; }
+    .new-log-area p { font-size: 0.7rem; }
+
+    /* Toast */
+    .toast { left: 8px; right: 8px; bottom: 8px; text-align: center; font-size: 0.78rem; padding: 12px 16px; }
+  }
+
+  /* ===== Responsive: Small Phone (≤400px) ===== */
+  @media (max-width: 400px) {
+    .datetime-row { grid-template-columns: repeat(3, 1fr); }
+    .app-title .team-logo { height: 18px; }
+    .app-title .title-text .main { font-size: 0.78rem; }
+    .header-actions .btn { font-size: 0.6rem; padding: 4px 5px; }
+    .lap-row input { width: 90px; }
+    .start-card h2 { font-size: 1.2rem; }
+    .start-card .start-icon { font-size: 2.5rem; }
+    .btn-lg { padding: 10px 20px; font-size: 0.8rem; letter-spacing: 1px; }
+    .tire-input-group-compact .tig-field { flex: 1 1 45px; }
+    .tire-input-group-compact .tig-field input { font-size: 0.8rem; padding: 6px 4px; }
+  }
+
+  @media print {
+    body { background: #fff; color: #000; }
+    body::before { display: none; }
+    .app-header, .log-nav, .session-bar, .header-actions, .btn,
+    .btn-remove-lap, .btn-xs, .new-log-area { display: none !important; }
+    .main-container { max-width: 100%; padding: 0; }
+    .form-card { border: 1px solid #ccc; page-break-inside: avoid; background: #fff; }
+    .form-card::after { display: none; }
+    .form-card input, .form-card textarea, .form-card select,
+    .tire-input-group-compact .tig-field input { border: 1px solid #ccc; background: #fff; color: #000; }
+    .section-title { color: #000; border-left-color: #000; }
+    .tire-section { background: #f5f5f5; border: 1px solid #ddd; }
+    .toggle-option.on.active { background: #e8f5e9; color: #000; }
+    .toggle-option.off.active { background: #f5f5f5; color: #000; }
+    .tire-input-group-compact { background: #f9f9f9; border: 1px solid #ddd; }
+    .tire-input-group-compact .tig-label { color: #000; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="app-title">
+    <img class="team-logo" src="270.png" alt="DIAN Racing" onerror="this.style.display='none'">
+    <div class="title-text">
+      <span class="main">Test Ride Log</span>
+      <span class="sub">DIAN Racing · 赛车测试日志</span>
+    </div>
+  </div>
+  <div class="header-actions" id="headerActions">
+    <!-- Filled dynamically -->
+  </div>
+</header>
+
+<!-- Main Content -->
+<div class="main-container" id="app">
+  <!-- Filled dynamically: start page or main log page -->
+</div>
+
+<script>
+// ============================================================
+// Data Model
+// ============================================================
+const STORAGE_KEY = 'testRideSessions';
+const STATE_KEY = 'testRideState';
+
+// Session = { sessionId, testTime, logger, createdAt, setup: Setup, logs: [ Log, ... ] }
+// Setup = { vcuVersion, tireType, tireNumber, treadDepth: {fl:{p1,p2,p3},fr,rl,rr},
+//           frontCamber, rearCamber, frontToe, rearToe, frontPressure, rearPressure,
+//           frontSpringRate, rearSpringRate,
+//           frontDamper: {hsComp,hsReb,lsComp,lsReb}, rearDamper: {hsComp,hsReb,lsComp,lsReb},
+//           arbSetting, notes }
+// Log = { id, createdAt, … }
+
+// App state: { mode: 'start'|'setup'|'main', currentSessionId: string|null, currentLogId: string|null }
+
+function getAllSessions() {
+  try {
+    const sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    // Migrate old tire data
+    for (const s of sessions) {
+      migrateSetup(s);
+      for (const l of (s.logs || [])) {
+        migrateTireFields(l);
+      }
+    }
+    return sessions;
+  }
+  catch { return []; }
+}
+
+function saveAllSessions(sessions) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+function getSession(id) {
+  return getAllSessions().find(s => s.sessionId === id);
+}
+
+function saveAppState(state) {
+  localStorage.setItem(STATE_KEY, JSON.stringify(state));
+}
+
+function getAppState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (s && typeof s.mode === 'string') return s;
+  } catch {}
+  return { mode: 'start', currentSessionId: null, currentLogId: null };
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function nowId() {
+  const d = new Date();
+  return d.getFullYear() +
+    String(d.getMonth()+1).padStart(2,'0') +
+    String(d.getDate()).padStart(2,'0') + '-' +
+    String(d.getHours()).padStart(2,'0') +
+    String(d.getMinutes()).padStart(2,'0') +
+    String(d.getSeconds()).padStart(2,'0');
+}
+
+function getEmptyLog() {
+  return {
+    id: 'LOG-' + nowId(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    startTime: '',
+    testItems: '',
+    testItemsCustom: '',
+    driver: '',
+    airTemp: '',
+    surfaceTemp: '',
+    surfaceCondition: '',
+    rot1: '', rot2: '', rot3: '',
+    tc: '',
+    reg: '',
+    mechanicalChanges: '',
+    // Pre-test tire
+    pre_flPressure: '', pre_frPressure: '',
+    pre_flTempOuter: '', pre_flTempMid: '', pre_flTempInner: '',
+    pre_frTempOuter: '', pre_frTempMid: '', pre_frTempInner: '',
+    pre_rlPressure: '', pre_rrPressure: '',
+    pre_rlTempOuter: '', pre_rlTempMid: '', pre_rlTempInner: '',
+    pre_rrTempOuter: '', pre_rrTempMid: '', pre_rrTempInner: '',
+    // Post-test tire
+    post_flPressure: '', post_frPressure: '',
+    post_flTempOuter: '', post_flTempMid: '', post_flTempInner: '',
+    post_frTempOuter: '', post_frTempMid: '', post_frTempInner: '',
+    post_rlPressure: '', post_rrPressure: '',
+    post_rlTempOuter: '', post_rlTempMid: '', post_rlTempInner: '',
+    post_rrTempOuter: '', post_rrTempMid: '', post_rrTempInner: '',
+    lapTimes: [],
+    notes: ''
+  };
+}
+
+// Migrate old log data to pre/post tire format
+function migrateTireFields(log) {
+  if (log._migrated) return log;
+  // If old-style tire fields exist and no pre_ fields, migrate
+  if (log.flPressure !== undefined && log.pre_flPressure === undefined) {
+    const oldFields = ['flPressure','frPressure','flTempOuter','flTempMid','flTempInner',
+      'frTempOuter','frTempMid','frTempInner','rlPressure','rrPressure',
+      'rlTempOuter','rlTempMid','rlTempInner','rrTempOuter','rrTempMid','rrTempInner'];
+    for (const f of oldFields) {
+      log['pre_' + f] = log[f] || '';
+      log['post_' + f] = '';
+    }
+    // Remove old fields
+    for (const f of oldFields) {
+      delete log[f];
+    }
+  }
+  log._migrated = true;
+  return log;
+}
+
+// Migrate old sessions that don't have setup data
+function migrateSetup(session) {
+  if (!session.setup) {
+    session.setup = getEmptySetup();
+  }
+}
+
+function getEmptySetup() {
+  return {
+    vcuVersion: '',
+    tireType: '',
+    tireNumber: '',
+    treadDepth: {
+      fl: { p1: '', p2: '', p3: '' },
+      fr: { p1: '', p2: '', p3: '' },
+      rl: { p1: '', p2: '', p3: '' },
+      rr: { p1: '', p2: '', p3: '' }
+    },
+    frontCamber: '',
+    rearCamber: '',
+    frontToe: '',
+    rearToe: '',
+    frontPressure: '',
+    rearPressure: '',
+    frontSpringRate: '',
+    rearSpringRate: '',
+    frontDamper: { hsComp: '', hsReb: '', lsComp: '', lsReb: '' },
+    rearDamper: { hsComp: '', hsReb: '', lsComp: '', lsReb: '' },
+    arbSetting: '',
+    notes: ''
+  };
+}
+
+// ============================================================
+// Test Items helpers
+// ============================================================
+const PREDEFINED_TEST_ITEMS = ['直线加速', '八字绕环', '高速避障', '耐久'];
+
+function isOtherTestItem(log) {
+  const v = log.testItems || '';
+  if (v === '其他') return true;
+  if (!v) return false;
+  return !PREDEFINED_TEST_ITEMS.includes(v);
+}
+
+function getTestItemDisplay(log) {
+  const v = log.testItems || '';
+  if (v === '其他' || (!PREDEFINED_TEST_ITEMS.includes(v) && v)) {
+    return log.testItemsCustom || v || '未填项目';
+  }
+  return v || '未填项目';
+}
+
+function onTestItemsChange() {
+  const sel = document.getElementById('testItemsSelect');
+  const custom = document.getElementById('testItemsCustom');
+  if (!sel || !custom) return;
+  if (sel.value === '其他') {
+    custom.style.display = '';
+    custom.focus();
+  } else {
+    custom.style.display = 'none';
+    custom.value = '';
+  }
+  autoSave();
+}
+
+// ============================================================
+// App State
+// ============================================================
+let appState = getAppState();
+
+// ============================================================
+// Initialize
+// ============================================================
+function init() {
+  // Validate state — session might have been deleted
+  if ((appState.mode === 'main' || appState.mode === 'setup') && appState.currentSessionId) {
+    const sess = getSession(appState.currentSessionId);
+    if (!sess) {
+      appState = { mode: 'start', currentSessionId: null, currentLogId: null };
+      saveAppState(appState);
+    }
+  }
+
+  if (appState.mode === 'main' && appState.currentSessionId) {
+    renderMainPage();
+  } else if (appState.mode === 'setup' && appState.currentSessionId) {
+    renderSetupPage();
+  } else {
+    renderStartPage();
+  }
+  updateHeader();
+}
+
+// ============================================================
+// Header Actions
+// ============================================================
+function updateHeader() {
+  const el = document.getElementById('headerActions');
+  if (appState.mode === 'main') {
+    el.innerHTML = `
+      <span style="color:var(--text2);font-size:0.85rem;display:flex;align-items:center;gap:6px;">
+        📋 ${getSession(appState.currentSessionId)?.logger || ''}
+      </span>
+      <button class="btn btn-primary" onclick="newTestSession()" title="导出当前测试并开始新测试">📦 新建测试</button>
+      <button class="btn btn-green" onclick="saveCurrentLog()">💾 保存</button>
+      <button class="btn btn-blue" onclick="exportSessionJSON()">📋 导出 JSON</button>
+      <button class="btn btn-blue" onclick="exportSessionCSV()">📊 导出 CSV</button>
+      <button class="btn btn-secondary" onclick="window.print()">🖨️ 打印</button>
+      <button class="btn btn-red btn-sm" onclick="deleteCurrentLog()">🗑️</button>
+      <button class="btn btn-secondary btn-sm" onclick="backToSetup()">↩ 返回调校</button>
+      <button class="btn btn-secondary btn-sm" onclick="backToStart()">↩ 返回首页</button>`;
+  } else if (appState.mode === 'setup') {
+    el.innerHTML = `
+      <span style="color:var(--text2);font-size:0.85rem;display:flex;align-items:center;gap:6px;">
+        📋 ${getSession(appState.currentSessionId)?.logger || ''}
+      </span>
+      <button class="btn btn-secondary btn-sm" onclick="backToStart()">↩ 返回首页</button>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+// ============================================================
+// START PAGE
+// ============================================================
+function renderStartPage() {
+  appState = { mode: 'start', currentSessionId: null, currentLogId: null };
+  saveAppState(appState);
+  updateHeader();
+
+  const now = new Date();
+  const thisYear = now.getFullYear();
+
+  document.getElementById('app').innerHTML = `
+<div class="start-wrapper">
+  <div class="start-card">
+    <div class="start-icon">⚡</div>
+    <h2>Test Ride Log</h2>
+    <p class="start-subtitle">DIAN RACING · 开始新测试</p>
+
+    <div class="form-group">
+      <label>测试时间 Test Time</label>
+      <div class="datetime-row">
+        <select id="stYear">${Array.from({length:5},(_,i)=>`<option value="${thisYear-2+i}"${thisYear-2+i===now.getFullYear()?' selected':''}>${thisYear-2+i}年</option>`).join('')}</select>
+        <select id="stMonth">${Array.from({length:12},(_,i)=>`<option value="${i+1}"${i+1===now.getMonth()+1?' selected':''}>${i+1}月</option>`).join('')}</select>
+        <select id="stDay">${Array.from({length:31},(_,i)=>`<option value="${i+1}"${i+1===now.getDate()?' selected':''}>${i+1}日</option>`).join('')}</select>
+        <select id="stHour">${Array.from({length:24},(_,i)=>`<option value="${String(i).padStart(2,'0')}"${i===now.getHours()?' selected':''}>${String(i).padStart(2,'0')}时</option>`).join('')}</select>
+        <select id="stMin">${Array.from({length:12},(_,i)=>`<option value="${String(i*5).padStart(2,'0')}"${i*5===Math.floor(now.getMinutes()/5)*5?' selected':''}>${String(i*5).padStart(2,'0')}分</option>`).join('')}</select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>👤 日志填写人 Logger</label>
+      <input id="stLogger" placeholder="填写人姓名" autocomplete="off">
+    </div>
+
+    <div class="start-actions">
+      <button class="btn btn-primary btn-lg" onclick="startSession()">▶ 开 始</button>
+    </div>
+  </div>
+</div>`;
+
+  document.getElementById('stLogger').focus();
+
+  // Enter key to start
+  document.getElementById('stLogger').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') startSession();
+  });
+}
+
+function startSession() {
+  const year = document.getElementById('stYear').value;
+  const month = String(document.getElementById('stMonth').value).padStart(2,'0');
+  const day = String(document.getElementById('stDay').value).padStart(2,'0');
+  const hour = document.getElementById('stHour').value;
+  const min = document.getElementById('stMin').value;
+  const logger = document.getElementById('stLogger').value.trim();
+
+  if (!logger) {
+    showToast('⚠️ 请输入填写人姓名');
+    document.getElementById('stLogger').focus();
+    return;
+  }
+
+  const sessionId = 'TEST-' + year + month + day + '-' + hour + min;
+  const testTime = `${year}-${month}-${day} ${hour}:${min}`;
+
+  const session = {
+    sessionId,
+    testTime,
+    logger,
+    createdAt: new Date().toISOString(),
+    setup: getEmptySetup(),
+    logs: []
+  };
+
+  const sessions = getAllSessions();
+  sessions.push(session);
+  saveAllSessions(sessions);
+
+  appState = {
+    mode: 'setup',
+    currentSessionId: sessionId,
+    currentLogId: null
+  };
+  saveAppState(appState);
+
+  renderSetupPage();
+  updateHeader();
+  showToast('✅ 新测试已创建 — 请填写调校状态');
+}
+
+function backToStart() {
+  if (appState.mode === 'main') autoSave();
+  if (appState.mode === 'setup') autoSaveSetup();
+  appState = { mode: 'start', currentSessionId: null, currentLogId: null };
+  saveAppState(appState);
+  renderStartPage();
+  updateHeader();
+}
+
+function backToSetup() {
+  autoSave();
+  appState.mode = 'setup';
+  appState.currentLogId = null;
+  saveAppState(appState);
+  renderSetupPage();
+  updateHeader();
+}
+
+// ============================================================
+// SETUP PAGE
+// ============================================================
+function renderSetupPage() {
+  const session = getSession(appState.currentSessionId);
+  if (!session) { renderStartPage(); return; }
+  const s = session.setup || getEmptySetup();
+  const v = (key) => (s[key] == null ? '' : String(s[key])).replace(/"/g, '&quot;');
+  const td = (corner, pt) => {
+    const c = (s.treadDepth || {})[corner] || {};
+    return (c[pt] == null ? '' : String(c[pt])).replace(/"/g, '&quot;');
+  };
+  const damper = (axle, field) => {
+    const d = s[axle] || {};
+    return (d[field] == null ? '' : String(d[field])).replace(/"/g, '&quot;');
+  };
+
+  document.getElementById('app').innerHTML = `
+  <div class="session-bar">
+    <span class="sess-label">测试时间:</span>
+    <span class="sess-value">${session.testTime}</span>
+    <span class="sess-label">填写人:</span>
+    <span class="sess-value">${session.logger}</span>
+  </div>
+
+  <form id="setupForm" onchange="autoSaveSetup()" oninput="autoSaveSetup()">
+
+    <!-- VCU -->
+    <div class="form-card">
+      <div class="section-title"><span class="dot"></span>动力 Powertrain</div>
+      <div class="form-row cols-2">
+        <div class="form-group">
+          <label>VCU 程序版本 VCU Version</label>
+          <input name="vcuVersion" value="${v('vcuVersion')}" placeholder="如: VCU_v2.3.1">
+        </div>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- 轮胎 -->
+    <div class="form-card">
+      <div class="section-title"><span class="dot"></span>轮胎 Tyre</div>
+      <div class="form-row cols-3">
+        <div class="form-group">
+          <label>轮胎类型 Tyre Type</label>
+          <select name="tireType" id="tireTypeSelect" onchange="onTireTypeChange()">
+            <option value="">— 请选择 —</option>
+            <option value="干胎"${s.tireType==='干胎'?' selected':''}>干胎 Dry</option>
+            <option value="雨胎"${s.tireType==='雨胎'?' selected':''}>雨胎 Wet</option>
+          </select>
+        </div>
+        <div class="form-group" id="tireNumberGroup" style="${s.tireType==='干胎'?'':'display:none;'}">
+          <label>轮胎编号 Tyre Number</label>
+          <select name="tireNumber">
+            <option value="">— 请选择 —</option>
+            ${[1,2,3,4].map(n => `<option value="${n}"${s.tireNumber==String(n)?' selected':''}>${n} 号胎</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>前轮胎压 Front Pressure<span class="unit"> psi</span></label>
+          <input type="number" name="frontPressure" value="${v('frontPressure')}" step="0.1" placeholder="0.0">
+        </div>
+        <div class="form-group">
+          <label>后轮胎压 Rear Pressure<span class="unit"> psi</span></label>
+          <input type="number" name="rearPressure" value="${v('rearPressure')}" step="0.1" placeholder="0.0">
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:20px;margin-bottom:12px;font-size:0.85rem;border-left-color:#555;">胎面测量点深度 Tread Depth<span class="unit"> mm</span></div>
+      <div class="tread-grid">
+        <div class="tread-row">
+          <span class="tread-label">FL 左前</span>
+          <span class="tread-label-sm">P1</span><input type="number" name="td_fl_p1" value="${td('fl','p1')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P2</span><input type="number" name="td_fl_p2" value="${td('fl','p2')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P3</span><input type="number" name="td_fl_p3" value="${td('fl','p3')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="tread-row">
+          <span class="tread-label">FR 右前</span>
+          <span class="tread-label-sm">P1</span><input type="number" name="td_fr_p1" value="${td('fr','p1')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P2</span><input type="number" name="td_fr_p2" value="${td('fr','p2')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P3</span><input type="number" name="td_fr_p3" value="${td('fr','p3')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="tread-row">
+          <span class="tread-label">RL 左后</span>
+          <span class="tread-label-sm">P1</span><input type="number" name="td_rl_p1" value="${td('rl','p1')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P2</span><input type="number" name="td_rl_p2" value="${td('rl','p2')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P3</span><input type="number" name="td_rl_p3" value="${td('rl','p3')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="tread-row">
+          <span class="tread-label">RR 右后</span>
+          <span class="tread-label-sm">P1</span><input type="number" name="td_rr_p1" value="${td('rr','p1')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P2</span><input type="number" name="td_rr_p2" value="${td('rr','p2')}" step="0.01" placeholder="0.00">
+          <span class="tread-label-sm">P3</span><input type="number" name="td_rr_p3" value="${td('rr','p3')}" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:20px;margin-bottom:12px;font-size:0.85rem;border-left-color:#555;">定位角度 Alignment<span class="unit"> °</span></div>
+      <div class="form-row cols-4">
+        <div class="form-group">
+          <label>前轮 Camber</label>
+          <input type="number" name="frontCamber" value="${v('frontCamber')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>后轮 Camber</label>
+          <input type="number" name="rearCamber" value="${v('rearCamber')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>前轮 Toe</label>
+          <input type="number" name="frontToe" value="${v('frontToe')}" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>后轮 Toe</label>
+          <input type="number" name="rearToe" value="${v('rearToe')}" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+    </div>
+
+    <!-- 悬架调校 -->
+    <div class="form-card">
+      <div class="section-title"><span class="dot"></span>悬架调校 Suspension Setup</div>
+      <div class="form-row cols-4">
+        <div class="form-group">
+          <label>前悬弹簧刚度 Front Spring<span class="unit"> N/mm</span></label>
+          <input type="number" name="frontSpringRate" value="${v('frontSpringRate')}" step="0.1" placeholder="0.0">
+        </div>
+        <div class="form-group">
+          <label>后悬弹簧刚度 Rear Spring<span class="unit"> N/mm</span></label>
+          <input type="number" name="rearSpringRate" value="${v('rearSpringRate')}" step="0.1" placeholder="0.0">
+        </div>
+        <div class="form-group">
+          <label>ARB 档位 ARB<span class="unit"> 1最软–6最刚</span></label>
+          <select name="arbSetting">
+            <option value="">— 请选择 —</option>
+            ${[1,2,3,4,5,6].map(n => `<option value="${n}"${s.arbSetting==String(n)?' selected':''}>${n} — ${n===1?'最软':n===6?'最刚':''}</option>`).join('')}
+          </select>
+        </div>
+        <div></div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="font-size:0.78rem;font-weight:700;color:#fff;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">阻尼档位 Damper Settings</div>
+        <div class="damper-section">
+          <div class="damper-col">
+            <div class="damper-title">前悬 Front</div>
+            <div class="form-row cols-2" style="margin-bottom:0;">
+              <div class="form-group">
+                <label>高速压缩 HSC</label>
+                <input type="number" name="fd_hsComp" value="${damper('frontDamper','hsComp')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>高速回弹 HSR</label>
+                <input type="number" name="fd_hsReb" value="${damper('frontDamper','hsReb')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>低速压缩 LSC</label>
+                <input type="number" name="fd_lsComp" value="${damper('frontDamper','lsComp')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>低速回弹 LSR</label>
+                <input type="number" name="fd_lsReb" value="${damper('frontDamper','lsReb')}" step="1" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="damper-col">
+            <div class="damper-title">后悬 Rear</div>
+            <div class="form-row cols-2" style="margin-bottom:0;">
+              <div class="form-group">
+                <label>高速压缩 HSC</label>
+                <input type="number" name="rd_hsComp" value="${damper('rearDamper','hsComp')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>高速回弹 HSR</label>
+                <input type="number" name="rd_hsReb" value="${damper('rearDamper','hsReb')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>低速压缩 LSC</label>
+                <input type="number" name="rd_lsComp" value="${damper('rearDamper','lsComp')}" step="1" placeholder="0">
+              </div>
+              <div class="form-group">
+                <label>低速回弹 LSR</label>
+                <input type="number" name="rd_lsReb" value="${damper('rearDamper','lsReb')}" step="1" placeholder="0">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 备注 -->
+    <div class="form-card">
+      <div class="section-title"><span class="dot"></span>备注 Notes</div>
+      <div class="form-group">
+        <label>空套完整性、特殊配置等</label>
+        <textarea name="setupNotes" rows="3" placeholder="如：空套完整性检查、特殊配置说明等……">${v('notes')}</textarea>
+      </div>
+    </div>
+
+  </form>
+
+  <!-- Actions -->
+  <div style="display:flex;gap:16px;justify-content:center;padding:20px 0 40px;flex-wrap:wrap;">
+    <button class="btn btn-secondary btn-lg" onclick="skipSetup()">跳过 Skip</button>
+    <button class="btn btn-primary btn-lg" onclick="saveSetupAndProceed()">保存并进入日志 Save & Log</button>
+  </div>`;
+}
+
+function onTireTypeChange() {
+  const sel = document.getElementById('tireTypeSelect');
+  const row = document.getElementById('tireNumberGroup');
+  if (!sel || !row) return;
+  row.style.display = sel.value === '干胎' ? '' : 'none';
+  if (sel.value !== '干胎') {
+    const numSel = document.querySelector('[name="tireNumber"]');
+    if (numSel) numSel.value = '';
+  }
+  autoSaveSetup();
+}
+
+function autoSaveSetup() {
+  if (appState.mode !== 'setup' || !appState.currentSessionId) return;
+  const sessions = getAllSessions();
+  const sIdx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (sIdx === -1) return;
+  const setup = sessions[sIdx].setup;
+  if (!setup) return;
+
+  const form = document.getElementById('setupForm');
+  if (!form) return;
+
+  const simpleFields = ['vcuVersion','tireType','tireNumber','frontCamber','rearCamber',
+    'frontToe','rearToe','frontPressure','rearPressure','frontSpringRate','rearSpringRate','arbSetting'];
+  for (const f of simpleFields) {
+    const el = form.querySelector(`[name="${f}"]`);
+    if (el) setup[f] = el.value;
+  }
+  // Notes
+  const notesEl = form.querySelector('[name="setupNotes"]');
+  if (notesEl) setup.notes = notesEl.value;
+
+  // Tread depth
+  for (const corner of ['fl','fr','rl','rr']) {
+    for (const pt of ['p1','p2','p3']) {
+      const el = form.querySelector(`[name="td_${corner}_${pt}"]`);
+      if (el) setup.treadDepth[corner][pt] = el.value;
+    }
+  }
+
+  // Dampers
+  for (const [prefix, key] of [['fd','frontDamper'],['rd','rearDamper']]) {
+    for (const field of ['hsComp','hsReb','lsComp','lsReb']) {
+      const el = form.querySelector(`[name="${prefix}_${field}"]`);
+      if (el) setup[key][field] = el.value;
+    }
+  }
+
+  saveAllSessions(sessions);
+}
+
+function skipSetup() {
+  // Save empty/current setup and proceed
+  autoSaveSetup();
+  proceedToLogs();
+}
+
+function saveSetupAndProceed() {
+  autoSaveSetup();
+  proceedToLogs();
+}
+
+function proceedToLogs() {
+  const sessions = getAllSessions();
+  const sIdx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (sIdx === -1) return;
+
+  // Create first log if none exist
+  if (sessions[sIdx].logs.length === 0) {
+    sessions[sIdx].logs.push(getEmptyLog());
+    saveAllSessions(sessions);
+  }
+
+  appState = {
+    mode: 'main',
+    currentSessionId: appState.currentSessionId,
+    currentLogId: sessions[sIdx].logs[0].id
+  };
+  saveAppState(appState);
+  renderMainPage();
+  updateHeader();
+  showToast('✅ 调校状态已保存，开始记录日志');
+}
+
+// ============================================================
+// MAIN PAGE
+// ============================================================
+function renderMainPage() {
+  const session = getSession(appState.currentSessionId);
+  if (!session) { renderStartPage(); return; }
+
+  // Ensure currentLogId is valid
+  if (!session.logs.find(l => l.id === appState.currentLogId)) {
+    appState.currentLogId = session.logs[session.logs.length - 1]?.id || null;
+  }
+  if (!appState.currentLogId && session.logs.length > 0) {
+    appState.currentLogId = session.logs[0].id;
+  }
+  saveAppState(appState);
+
+  const log = session.logs.find(l => l.id === appState.currentLogId);
+  if (!log) {
+    appState.currentLogId = session.logs[0]?.id;
+    saveAppState(appState);
+    if (!appState.currentLogId) { renderStartPage(); return; }
+    renderMainPage();
+    return;
+  }
+
+  // Build everything in one go
+  const app = document.getElementById('app');
+  app.innerHTML = buildSessionBarHTML(session) + buildLogSelectorHTML(session) + '<div id="formContainer"></div>';
+  renderLogForm(log);
+  updateHeader();
+}
+
+function buildSessionBarHTML(session) {
+  return `
+    <div class="session-bar">
+      <span class="sess-label">📅 测试时间:</span>
+      <span class="sess-value">${session.testTime}</span>
+      <span class="sess-label">👤 填写人:</span>
+      <span class="sess-value">${session.logger}</span>
+      <span class="sess-label">🔢 日志数:</span>
+      <span class="sess-value">${session.logs.length} 篇</span>
+    </div>`;
+}
+
+function buildLogSelectorHTML(session) {
+  return `
+    <div class="log-nav">
+      <span class="label">📋 日志列表：</span>
+      <select id="logSelector" onchange="switchLog(this.value)">
+        ${session.logs.map((l, i) => {
+          const d = new Date(l.createdAt);
+          const label = `${l.id} — ${l.driver || '(未命名车手)'} — ${getTestItemDisplay(l)} — ${l.startTime || d.toLocaleTimeString('zh-CN')}`;
+          const s = l.id === appState.currentLogId ? ' selected' : '';
+          return `<option value="${l.id}"${s}>第${i+1}篇: ${label}</option>`;
+        }).join('')}
+      </select>
+      <span class="log-count">共 ${session.logs.length} 篇</span>
+    </div>`;
+}
+
+function switchLog(id) {
+  if (!id) return;
+  autoSave();
+  appState.currentLogId = id;
+  saveAppState(appState);
+  renderMainPage();
+}
+
+// ============================================================
+// Log Form
+// ============================================================
+function renderLogForm(log) {
+  if (!log) return;
+
+  const v = (key) => (log[key] == null ? '' : String(log[key])).replace(/"/g, '&quot;');
+  const laps = log.lapTimes || [];
+
+  let lapRowsHTML = '';
+  laps.forEach((t, i) => {
+    lapRowsHTML += `
+      <div class="lap-row">
+        <span class="lap-num">Lap ${i + 1}</span>
+        <input class="lap-time-input" value="${(t||'').replace(/"/g,'&quot;')}" placeholder="MM:SS.mmm" onchange="autoSave()">
+        <button class="btn-remove-lap" onclick="removeLap(${i})" title="删除此行" type="button">✕</button>
+      </div>`;
+  });
+
+  document.getElementById('formContainer').innerHTML = `
+<form id="logForm" onchange="autoSave()" oninput="autoSave()">
+
+  <!-- ===== 基本信息 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>基本信息 Basic Info</div>
+    <div class="form-row cols-4">
+      <div class="form-group">
+        <label>开启时间 Start Time</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="startHour" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
+            ${Array.from({length:24},(_,i)=>{
+              const hh = String(i).padStart(2,'0');
+              const sel = log.startTime && log.startTime.startsWith(hh+':') ? ' selected' : '';
+              return `<option value="${hh}"${sel}>${hh} 时</option>`;
+            }).join('')}
+          </select>
+          <span style="color:var(--text2);">:</span>
+          <select name="startMin" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
+            ${Array.from({length:12},(_,i)=>{
+              const mm = String(i*5).padStart(2,'0');
+              const sel = log.startTime && log.startTime.endsWith(':'+mm) ? ' selected' : '';
+              return `<option value="${mm}"${sel}>${mm} 分</option>`;
+            }).join('')}
+          </select>
+        </div>
+        <input type="hidden" name="startTime" value="${v('startTime')}">
+      </div>
+      <div class="form-group">
+        <label>测试项目 Test Items</label>
+        <select name="testItems" id="testItemsSelect" onchange="onTestItemsChange()">
+          <option value="">— 请选择 —</option>
+          <option value="直线加速"${v('testItems')==='直线加速'?' selected':''}>直线加速</option>
+          <option value="八字绕环"${v('testItems')==='八字绕环'?' selected':''}>八字绕环</option>
+          <option value="高速避障"${v('testItems')==='高速避障'?' selected':''}>高速避障</option>
+          <option value="耐久"${v('testItems')==='耐久'?' selected':''}>耐久</option>
+          <option value="其他"${isOtherTestItem(log)?' selected':''}>其他</option>
+        </select>
+        <input name="testItemsCustom" id="testItemsCustom" value="${v('testItemsCustom')}" placeholder="请输入具体测试名称" style="margin-top:6px;${isOtherTestItem(log)?'':'display:none;'}">
+      </div>
+      <div class="form-group">
+        <label>车手代号 Driver</label>
+        <input name="driver" value="${v('driver')}" placeholder="车手代号">
+      </div>
+      <div class="form-group">
+        <label>地面状态 Surface</label>
+        <select name="surfaceCondition">
+          <option value="">— 请选择 —</option>
+          <option value="干"${v('surfaceCondition')==='干'?' selected':''}>干 Dry</option>
+          <option value="湿"${v('surfaceCondition')==='湿'?' selected':''}>湿 Damp</option>
+          <option value="积水"${v('surfaceCondition')==='积水'?' selected':''}>积水 Wet</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>气温 Air Temp<span class="unit">°C</span></label>
+        <input type="number" name="airTemp" value="${v('airTemp')}" placeholder="环境气温" step="0.1">
+      </div>
+      <div class="form-group">
+        <label>地表温度 Surface Temp<span class="unit">°C</span></label>
+        <input type="number" name="surfaceTemp" value="${v('surfaceTemp')}" placeholder="赛道地表温度" step="0.1">
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 调校设置 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>调校设置 Setup / Adjustment</div>
+    <div class="form-row cols-3">
+      <div class="form-group">
+        <label>Rot 1</label>
+        <input name="rot1" value="${v('rot1')}" placeholder="旋钮位置 1">
+      </div>
+      <div class="form-group">
+        <label>Rot 2</label>
+        <input name="rot2" value="${v('rot2')}" placeholder="旋钮位置 2">
+      </div>
+      <div class="form-group">
+        <label>Rot 3</label>
+        <input name="rot3" value="${v('rot3')}" placeholder="旋钮位置 3">
+      </div>
+    </div>
+    <div class="form-row cols-2" style="margin-bottom:16px;">
+      <div class="form-group">
+        <label>TC 牵引力控制</label>
+        <div class="toggle-group">
+          <label class="toggle-option on${v('tc')==='on'?' active':''}" onclick="setToggle('tc','on')">
+            <input type="radio" name="tc_radio" value="on"${v('tc')==='on'?' checked':''}> ON
+          </label>
+          <label class="toggle-option off${v('tc')==='off'?' active':''}" onclick="setToggle('tc','off')">
+            <input type="radio" name="tc_radio" value="off"${v('tc')==='off'?' checked':''}> OFF
+          </label>
+          <input type="hidden" name="tc" value="${v('tc')}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>REG 回充</label>
+        <div class="toggle-group">
+          <label class="toggle-option on${v('reg')==='on'?' active':''}" onclick="setToggle('reg','on')">
+            <input type="radio" name="reg_radio" value="on"${v('reg')==='on'?' checked':''}> ON
+          </label>
+          <label class="toggle-option off${v('reg')==='off'?' active':''}" onclick="setToggle('reg','off')">
+            <input type="radio" name="reg_radio" value="off"${v('reg')==='off'?' checked':''}> OFF
+          </label>
+          <input type="hidden" name="reg" value="${v('reg')}">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>🔧 机械参数更改 Mechanical Changes</label>
+      <textarea name="mechanicalChanges" rows="5" placeholder="记录本次测试前进行的调整">${v('mechanicalChanges')}</textarea>
+    </div>
+  </div>
+
+  <!-- ===== 轮胎状况 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>轮胎状况 Tire Condition</div>
+    <div class="tire-dual">
+      <div class="tire-col">
+        <div class="tire-col-title">测试前 Pre-Test</div>
+        <div class="tire-visual-wrap">
+          <canvas id="tireCanvasPre" width="720" height="520"></canvas>
+        </div>
+        <div class="tire-inputs-compact" id="tireInputsPre"></div>
+      </div>
+      <div class="tire-col">
+        <div class="tire-col-title">测试后 Post-Test</div>
+        <div class="tire-visual-wrap">
+          <canvas id="tireCanvasPost" width="720" height="520"></canvas>
+        </div>
+        <div class="tire-inputs-compact" id="tireInputsPost"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 圈速纪录 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>圈速纪录 Lap Record</div>
+    <div class="lap-list" id="lapList">${lapRowsHTML}</div>
+    <button class="btn btn-blue btn-sm" onclick="addLap()" type="button">＋ 添加圈速</button>
+    <div class="lap-summary" id="lapSummary"></div>
+  </div>
+
+  <!-- ===== 备注 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>备注 Notes</div>
+    <div class="form-group">
+      <label>注：测试过程中的其他观察、异常、调校建议等</label>
+      <textarea name="notes" rows="4" placeholder="在此记录测试过程中的发现、问题、建议……">${v('notes')}</textarea>
+    </div>
+  </div>
+
+</form>
+
+<!-- ===== 新建日志区域 ===== -->
+<div class="new-log-area">
+  <button class="btn btn-primary btn-lg" onclick="addNewLog()">＋ 新建日志（下一篇）</button>
+  <p style="color:var(--text2);font-size:0.82rem;margin-top:8px;">
+    当赛车停下更换车手 / 调校 / 测试项目时，点击此处新增一篇日志
+  </p>
+</div>`;
+
+  updateLapSummary();
+  syncStartTime();
+  renderTireInputs(log, 'pre');
+  renderTireInputs(log, 'post');
+  setTimeout(() => { drawTireVisual('tireCanvasPre', 'pre'); }, 50);
+  setTimeout(() => { drawTireVisual('tireCanvasPost', 'post'); }, 100);
+}
+
+// ============================================================
+// Start Time: hour + min selects → hidden input
+// ============================================================
+function syncStartTime() {
+  const h = document.querySelector('[name="startHour"]');
+  const m = document.querySelector('[name="startMin"]');
+  const hidden = document.querySelector('[name="startTime"]');
+  if (!h || !m || !hidden) return;
+  const newTime = h.value + ':' + m.value;
+  hidden.value = newTime;
+
+  // Update current log's option text in the dropdown
+  const sel = document.getElementById('logSelector');
+  if (sel && appState.currentLogId) {
+    const opt = sel.querySelector(`option[value="${appState.currentLogId}"]`);
+    if (opt) {
+      const parts = opt.textContent.split(' — ');
+      if (parts.length >= 4) {
+        parts[parts.length - 1] = newTime;
+        opt.textContent = parts.join(' — ');
+      }
+    }
+  }
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.name === 'startHour' || e.target.name === 'startMin') {
+    syncStartTime();
+  }
+});
+
+// ============================================================
+// Tire Inputs (compact form below the visual)
+// ============================================================
+function renderTireInputs(log, prefix) {
+  const el = document.getElementById('tireInputs' + (prefix === 'pre' ? 'Pre' : 'Post'));
+  if (!el) return;
+  const pf = prefix + '_';
+  const v = (k) => (log[pf + k] == null ? '' : String(log[pf + k])).replace(/"/g, '&quot;');
+  const canvasId = prefix === 'pre' ? 'tireCanvasPre' : 'tireCanvasPost';
+
+  el.innerHTML = `
+    <div class="tire-input-group-compact">
+      <div class="tig-label">🔵 FL 左前</div>
+      <div class="tig-row">
+        <div class="tig-field"><span>外°C</span><input type="number" name="${pf}flTempOuter" value="${v('flTempOuter')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>中°C</span><input type="number" name="${pf}flTempMid" value="${v('flTempMid')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>内°C</span><input type="number" name="${pf}flTempInner" value="${v('flTempInner')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field tig-pressure"><span>psi</span><input type="number" name="${pf}flPressure" value="${v('flPressure')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')"></div>
+      </div>
+    </div>
+    <div class="tire-input-group-compact">
+      <div class="tig-label">🔵 FR 右前</div>
+      <div class="tig-row">
+        <div class="tig-field"><span>外°C</span><input type="number" name="${pf}frTempOuter" value="${v('frTempOuter')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>中°C</span><input type="number" name="${pf}frTempMid" value="${v('frTempMid')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>内°C</span><input type="number" name="${pf}frTempInner" value="${v('frTempInner')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field tig-pressure"><span>psi</span><input type="number" name="${pf}frPressure" value="${v('frPressure')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')"></div>
+      </div>
+    </div>
+    <div class="tire-input-group-compact">
+      <div class="tig-label">🔴 RL 左后</div>
+      <div class="tig-row">
+        <div class="tig-field"><span>外°C</span><input type="number" name="${pf}rlTempOuter" value="${v('rlTempOuter')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>中°C</span><input type="number" name="${pf}rlTempMid" value="${v('rlTempMid')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>内°C</span><input type="number" name="${pf}rlTempInner" value="${v('rlTempInner')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field tig-pressure"><span>psi</span><input type="number" name="${pf}rlPressure" value="${v('rlPressure')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')"></div>
+      </div>
+    </div>
+    <div class="tire-input-group-compact">
+      <div class="tig-label">🔴 RR 右后</div>
+      <div class="tig-row">
+        <div class="tig-field"><span>外°C</span><input type="number" name="${pf}rrTempOuter" value="${v('rrTempOuter')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>中°C</span><input type="number" name="${pf}rrTempMid" value="${v('rrTempMid')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field"><span>内°C</span><input type="number" name="${pf}rrTempInner" value="${v('rrTempInner')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')" oninput="drawTireVisualDebounced('${canvasId}','${prefix}')"></div>
+        <div class="tig-field tig-pressure"><span>psi</span><input type="number" name="${pf}rrPressure" value="${v('rrPressure')}" step="0.1" placeholder="0" onchange="autoSave();drawTireVisual('${canvasId}','${prefix}')"></div>
+      </div>
+    </div>`;
+}
+
+// Debounced version for oninput (smoother typing)
+let tireDrawTimerPre, tireDrawTimerPost;
+function drawTireVisualDebounced(canvasId, prefix) {
+  if (prefix === 'pre') {
+    clearTimeout(tireDrawTimerPre);
+    tireDrawTimerPre = setTimeout(() => drawTireVisual(canvasId, prefix), 100);
+  } else {
+    clearTimeout(tireDrawTimerPost);
+    tireDrawTimerPost = setTimeout(() => drawTireVisual(canvasId, prefix), 100);
+  }
+}
+
+// ============================================================
+// Tire Canvas Visualization
+// ============================================================
+function tempToColor(temp) {
+  // Map temperature 0→80+°C to a blue→red gradient
+  if (temp == null || temp === '' || isNaN(temp)) return [80, 80, 80];
+
+  const t = parseFloat(temp);
+  if (t <= 0)  return [50, 80, 220];      // deep blue
+  if (t <= 15) { const r = t / 15;
+    return [Math.round(50 + r*(0-50)),    Math.round(80 + r*(180-80)),   Math.round(220 + r*(200-220))]; }
+  if (t <= 30) { const r = (t-15) / 15;
+    return [Math.round(0 + r*(40-0)),     Math.round(180 + r*(180-180)), Math.round(200 + r*(80-200))]; }
+  if (t <= 45) { const r = (t-30) / 15;
+    return [Math.round(40 + r*(220-40)),  Math.round(180 + r*(200-180)), Math.round(80 + r*(40-80))]; }
+  if (t <= 60) { const r = (t-45) / 15;
+    return [Math.round(220 + r*(240-220)), Math.round(200 + r*(120-200)), Math.round(40 + r*(30-40))]; }
+  if (t <= 80) { const r = (t-60) / 20;
+    return [Math.round(240 + r*(230-240)), Math.round(120 + r*(50-120)),  Math.round(30 + r*(30-30))]; }
+  return [230, 50, 30]; // hot red for >80
+}
+
+function getInputVal(name, prefix) {
+  const fullName = prefix ? prefix + '_' + name : name;
+  const el = document.querySelector(`[name="${fullName}"]`);
+  if (!el) return null;
+  const v = el.value;
+  if (v === '' || v == null) return null;
+  return parseFloat(v);
+}
+
+function drawTireVisual(canvasId, prefix) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const pf = prefix || 'pre';
+  // Responsive + HiDPI sizing
+  const dpr = window.devicePixelRatio || 1;
+  const BASE_W = 620;
+  const BASE_H = 460;
+  const container = canvas.parentElement;
+  const availW = container ? container.clientWidth - 16 : BASE_W;
+  const scale = Math.min(1, availW / BASE_W);
+  const displayW = Math.floor(BASE_W * scale);
+  const displayH = Math.floor(BASE_H * scale);
+  canvas.width = Math.floor(displayW * dpr);
+  canvas.height = Math.floor(displayH * dpr);
+  canvas.style.width = displayW + 'px';
+  canvas.style.height = displayH + 'px';
+
+  const ctx = canvas.getContext('2d');
+  const W = BASE_W;  // base (logical) dimensions
+  const H = BASE_H;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.scale(scale * dpr, scale * dpr);
+
+  // Layout constants (BASE 620×460 → closer to column width for larger apparent size)
+  const TIRE_W = 130;
+  const TIRE_H = 46;
+  const PRES_BAR_W = 14;
+  const PRES_BAR_H = 86;
+  const PRES_GAP = 16;
+
+  // Car body center
+  const cx = W / 2;
+  const cy = H / 2 - 8;
+
+  // Tire positions (like a car, top-down view)
+  const tires = [
+    { label: 'FL', x: cx - 164, y: cy - 96, temps: ['flTempOuter','flTempMid','flTempInner'], pressure: 'flPressure', outerLeft: true },
+    { label: 'FR', x: cx + 34,  y: cy - 96, temps: ['frTempOuter','frTempMid','frTempInner'], pressure: 'frPressure', outerLeft: false },
+    { label: 'RL', x: cx - 164, y: cy + 42,  temps: ['rlTempOuter','rlTempMid','rlTempInner'], pressure: 'rlPressure', outerLeft: true },
+    { label: 'RR', x: cx + 34,  y: cy + 42,  temps: ['rrTempOuter','rrTempMid','rrTempInner'], pressure: 'rrPressure', outerLeft: false },
+  ];
+
+  // Draw car body outline
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 5]);
+  ctx.strokeRect(cx - 148, cy - 112, 296, 210);
+  ctx.setLineDash([]);
+  // Car label
+  ctx.fillStyle = '#888';
+  ctx.font = '11px "Segoe UI","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('← FRONT 车头', cx, cy - 128);
+  // Red accent line
+  ctx.strokeStyle = 'rgba(204,0,0,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 148, cy - 110);
+  ctx.lineTo(cx + 148, cy - 110);
+  ctx.stroke();
+
+  for (const tire of tires) {
+    const tx = tire.x;
+    const ty = tire.y;
+
+    // --- Temperature heatmap rectangle ---
+    const segW = TIRE_W / 3;
+    for (let i = 0; i < 3; i++) {
+      const fieldName = tire.temps[i];
+      const temp = getInputVal(fieldName, pf);
+      const [r, g, b] = tempToColor(temp);
+
+      // For FR and RR, the "outer" is on the right side
+      let si = tire.outerLeft ? i : (2 - i);
+
+      // Draw segment with slight gap
+      const sx = tx + si * segW;
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(sx + 1, ty, segW - 2, TIRE_H);
+
+      // Temperature label
+      ctx.fillStyle = (temp != null && temp > 35) ? '#fff' : '#e6edf3';
+      ctx.font = 'bold 12px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(temp != null ? temp.toFixed(0) + '°' : '—', sx + segW / 2, ty + TIRE_H / 2 + 5);
+    }
+
+    // Tire outline
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(tx, ty, TIRE_W, TIRE_H);
+
+    // O / M / I labels above the rectangle
+    const labels = tire.outerLeft ? ['外', '中', '内'] : ['内', '中', '外'];
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = '#666';
+      ctx.font = '9px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(labels[i], tx + i * segW + segW / 2, ty - 3);
+    }
+
+    // Tire label (FL, FR, etc.)
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(tire.label, tx + TIRE_W / 2, ty - 16);
+
+    // --- Pressure bar ---
+    const barX = tx + TIRE_W + PRES_GAP;
+    const barY = ty;
+
+    // Background
+    ctx.fillStyle = '#111';
+    ctx.fillRect(barX, barY, PRES_BAR_W, PRES_BAR_H);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, PRES_BAR_W, PRES_BAR_H);
+
+    const pressure = getInputVal(tire.pressure, pf);
+    if (pressure != null) {
+      const maxPsi = 15;
+      const pct = Math.min(pressure / maxPsi, 1);
+      const fillH = pct * PRES_BAR_H;
+
+      // Bar color: red if below 8, white if 8-11, silver if >11
+      let barColor;
+      if (pressure < 8) barColor = '#cc0000';
+      else if (pressure <= 11) barColor = '#ffffff';
+      else barColor = '#888888';
+
+      ctx.fillStyle = barColor;
+      ctx.fillRect(barX + 1, barY + PRES_BAR_H - fillH, PRES_BAR_W - 2, fillH);
+
+      // Value label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 10px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(pressure.toFixed(1), barX + PRES_BAR_W / 2, barY + PRES_BAR_H + 15);
+    } else {
+      ctx.fillStyle = '#555';
+      ctx.font = '10px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('—', barX + PRES_BAR_W / 2, barY + PRES_BAR_H + 15);
+    }
+
+    // Target zone (9-10 psi)
+    const targetY1 = barY + PRES_BAR_H - (9 / 15) * PRES_BAR_H;
+    const targetY2 = barY + PRES_BAR_H - (10 / 15) * PRES_BAR_H;
+    ctx.strokeStyle = 'rgba(204,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(barX - 4, targetY1);
+    ctx.lineTo(barX + PRES_BAR_W + 4, targetY1);
+    ctx.moveTo(barX - 4, targetY2);
+    ctx.lineTo(barX + PRES_BAR_W + 4, targetY2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // psi label
+    ctx.fillStyle = '#666';
+    ctx.font = '8px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('psi', barX + PRES_BAR_W / 2, barY + PRES_BAR_H + 26);
+  }
+
+  // --- Global temperature color legend ---
+  const legX = cx - 175;
+  const legY = cy + 168;
+  const legW = 350;
+  const legH = 15;
+
+  // Gradient bar
+  const gradient = ctx.createLinearGradient(legX, 0, legX + legW, 0);
+  gradient.addColorStop(0, 'rgb(50,80,220)');
+  gradient.addColorStop(0.1875, 'rgb(0,180,200)');
+  gradient.addColorStop(0.375, 'rgb(40,180,80)');
+  gradient.addColorStop(0.5625, 'rgb(220,200,40)');
+  gradient.addColorStop(0.75, 'rgb(240,120,30)');
+  gradient.addColorStop(1, 'rgb(230,50,30)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(legX, legY, legW, legH);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(legX, legY, legW, legH);
+
+  // Tick marks and labels
+  ctx.fillStyle = '#aaa';
+  ctx.font = 'bold 10px "Segoe UI","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  const ticks = [
+    { val: 0,  pct: 0,      label: '0°C' },
+    { val: 15, pct: 0.1875, label: '15°C' },
+    { val: 30, pct: 0.375,  label: '30°C' },
+    { val: 45, pct: 0.5625, label: '45°C' },
+    { val: 60, pct: 0.75,   label: '60°C' },
+    { val: 80, pct: 1,      label: '80°C+' }
+  ];
+  for (const t of ticks) {
+    const tx = legX + t.pct * legW;
+    ctx.beginPath();
+    ctx.moveTo(tx, legY - 5);
+    ctx.lineTo(tx, legY - 1);
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillText(t.label, tx, legY - 8);
+  }
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px "Segoe UI","Microsoft YaHei",sans-serif';
+  ctx.fillText('胎温 °C', legX + legW / 2, legY - 20);
+
+  ctx.restore();
+}
+
+// ============================================================
+// TC / REG Toggle
+// ============================================================
+function setToggle(fieldName, value) {
+  const form = document.getElementById('logForm');
+  if (!form) return;
+  const hidden = form.querySelector(`[name="${fieldName}"]`);
+  if (hidden) hidden.value = value;
+  const group = hidden.closest('.form-group');
+  if (group) {
+    group.querySelectorAll('.toggle-option').forEach(opt => opt.classList.remove('active'));
+    group.querySelectorAll(`.toggle-option.${value}`).forEach(opt => opt.classList.add('active'));
+  }
+  autoSave();
+}
+
+// ============================================================
+// Lap Times Management
+// ============================================================
+function addLap() {
+  const list = document.getElementById('lapList');
+  if (!list) return;
+  const idx = list.querySelectorAll('.lap-row').length;
+  const row = document.createElement('div');
+  row.className = 'lap-row';
+  row.innerHTML = `
+    <span class="lap-num">Lap ${idx + 1}</span>
+    <input class="lap-time-input" placeholder="MM:SS.mmm" onchange="autoSave()">
+    <button class="btn-remove-lap" onclick="removeLap(${idx})" title="删除此行" type="button">✕</button>`;
+  list.appendChild(row);
+  updateLapSummary();
+  autoSave();
+}
+
+function removeLap(index) {
+  const list = document.getElementById('lapList');
+  if (!list) return;
+  const rows = list.querySelectorAll('.lap-row');
+  if (rows[index]) rows[index].remove();
+  list.querySelectorAll('.lap-row').forEach((row, i) => {
+    row.querySelector('.lap-num').textContent = `Lap ${i + 1}`;
+  });
+  updateLapSummary();
+  autoSave();
+}
+
+function updateLapSummary() {
+  const summary = document.getElementById('lapSummary');
+  if (!summary) return;
+  const inputs = document.querySelectorAll('.lap-time-input');
+  const times = [];
+  let totalMs = 0, count = 0, bestMs = Infinity;
+  for (const inp of inputs) {
+    const v = inp.value.trim();
+    if (!v) continue;
+    const ms = parseLapToMs(v);
+    if (ms !== null) { times.push(ms); totalMs += ms; if (ms < bestMs) bestMs = ms; count++; }
+  }
+  if (count === 0) {
+    summary.innerHTML = '<span class="summary-item" style="color:var(--text2);">输入圈速后自动计算最佳 / 平均</span>';
+    return;
+  }
+  summary.innerHTML = `
+    <span class="summary-item">🏆 最佳: <strong>${msToLapStr(bestMs)}</strong></span>
+    <span class="summary-item">📊 平均: <strong>${msToLapStr(Math.round(totalMs/count))}</strong></span>
+    <span class="summary-item">📋 圈数: <strong>${count}</strong></span>`;
+}
+
+function parseLapToMs(str) {
+  const m = str.match(/^(\d+):(\d{1,2})(?:\.(\d+))?$/);
+  if (m) return parseInt(m[1])*60000 + parseInt(m[2])*1000 + (m[3] ? parseInt(m[3].padEnd(3,'0')) : 0);
+  const s = str.match(/^(\d+)(?:\.(\d+))?$/);
+  if (s) return parseInt(s[1])*1000 + (s[2] ? parseInt(s[2].padEnd(3,'0')) : 0);
+  return null;
+}
+
+function msToLapStr(ms) {
+  const min = Math.floor(ms/60000), sec = Math.floor((ms%60000)/1000), mil = ms%1000;
+  return min>0 ? `${min}:${String(sec).padStart(2,'0')}.${String(mil).padStart(3,'0')}` : `${sec}.${String(mil).padStart(3,'0')}`;
+}
+
+// ============================================================
+// New Log (append to current session)
+// ============================================================
+function addNewLog() {
+  autoSave();
+  const sessions = getAllSessions();
+  const idx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (idx === -1) return;
+
+  const newLog = getEmptyLog();
+  sessions[idx].logs.push(newLog);
+  saveAllSessions(sessions);
+
+  appState.currentLogId = newLog.id;
+  saveAppState(appState);
+
+  renderMainPage();
+  showToast('✅ 新日志已创建');
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+// ============================================================
+// New Test Session
+// ============================================================
+function newTestSession() {
+  autoSave();
+  // Export current session
+  const session = getSession(appState.currentSessionId);
+  if (session) {
+    exportSessionJSON_internal(session);
+  }
+  renderStartPage();
+  showToast('📦 当前测试已导出，开始新测试');
+}
+
+// ============================================================
+// Auto-save
+// ============================================================
+function autoSave() {
+  if (appState.mode !== 'main' || !appState.currentSessionId || !appState.currentLogId) return;
+  const sessions = getAllSessions();
+  const sIdx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (sIdx === -1) return;
+  const lIdx = sessions[sIdx].logs.findIndex(l => l.id === appState.currentLogId);
+  if (lIdx === -1) return;
+
+  const log = sessions[sIdx].logs[lIdx];
+  const form = document.getElementById('logForm');
+  if (!form) return;
+
+  const simpleFields = [
+    'testItems','testItemsCustom','driver','airTemp','surfaceTemp','surfaceCondition',
+    'rot1','rot2','rot3','mechanicalChanges','notes'
+  ];
+  const hiddenFields = ['tc','reg','startTime'];
+  const tireFields = [
+    'pre_flPressure','pre_frPressure',
+    'pre_flTempOuter','pre_flTempMid','pre_flTempInner',
+    'pre_frTempOuter','pre_frTempMid','pre_frTempInner',
+    'pre_rlPressure','pre_rrPressure',
+    'pre_rlTempOuter','pre_rlTempMid','pre_rlTempInner',
+    'pre_rrTempOuter','pre_rrTempMid','pre_rrTempInner',
+    'post_flPressure','post_frPressure',
+    'post_flTempOuter','post_flTempMid','post_flTempInner',
+    'post_frTempOuter','post_frTempMid','post_frTempInner',
+    'post_rlPressure','post_rrPressure',
+    'post_rlTempOuter','post_rlTempMid','post_rlTempInner',
+    'post_rrTempOuter','post_rrTempMid','post_rrTempInner'
+  ];
+
+  let changed = false;
+  for (const f of [...simpleFields, ...hiddenFields, ...tireFields]) {
+    const el = form.querySelector(`[name="${f}"]`);
+    if (el && log[f] !== el.value) { log[f] = el.value; changed = true; }
+  }
+
+  // Lap times
+  const lapInputs = form.querySelectorAll('.lap-time-input');
+  const newLaps = Array.from(lapInputs).map(el => el.value);
+  if (JSON.stringify(log.lapTimes) !== JSON.stringify(newLaps)) {
+    log.lapTimes = newLaps;
+    changed = true;
+  }
+
+  if (changed) {
+    log.updatedAt = new Date().toISOString();
+    sessions[sIdx].logs[lIdx] = log;
+    saveAllSessions(sessions);
+  }
+}
+
+function saveCurrentLog() {
+  autoSave();
+  if (appState.currentLogId) {
+    renderMainPage();
+    showToast('💾 日志已保存');
+  }
+}
+
+function deleteCurrentLog() {
+  if (!appState.currentSessionId || !appState.currentLogId) return;
+  const sessions = getAllSessions();
+  const sIdx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (sIdx === -1) return;
+
+  const session = sessions[sIdx];
+  if (session.logs.length <= 1) {
+    showToast('⚠️ 至少保留一篇日志，如需删除请直接新建测试');
+    return;
+  }
+
+  const log = session.logs.find(l => l.id === appState.currentLogId);
+  const label = log?.driver || log?.id || '当前日志';
+  if (!confirm(`确定要删除 "${label}" 吗？\n\n此操作不可撤销。`)) return;
+
+  sessions[sIdx].logs = sessions[sIdx].logs.filter(l => l.id !== appState.currentLogId);
+  saveAllSessions(sessions);
+
+  appState.currentLogId = sessions[sIdx].logs[sessions[sIdx].logs.length - 1].id;
+  saveAppState(appState);
+  renderMainPage();
+  showToast('🗑️ 日志已删除');
+}
+
+// ============================================================
+// Export
+// ============================================================
+function getExportData() {
+  if (appState.currentSessionId) {
+    return [getSession(appState.currentSessionId)].filter(Boolean);
+  }
+  return getAllSessions();
+}
+
+function exportSessionJSON() {
+  const data = getExportData();
+  if (data.length === 0) { showToast('⚠️ 没有可导出的数据'); return; }
+  exportSessionJSON_internal(data[0]);
+}
+
+function exportSessionJSON_internal(session) {
+  const blob = new Blob([JSON.stringify(session, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, `TestRide_${session.sessionId}.json`);
+}
+
+function exportSessionCSV() {
+  const data = getExportData();
+  if (data.length === 0) { showToast('⚠️ 没有可导出的数据'); return; }
+  const session = data[0];
+
+  const st = session.setup || getEmptySetup();
+  function sv(k) { const v = st[k]; return (v == null ? '' : String(v)); }
+  function tdv(corner, pt) {
+    const td = st.treadDepth || {};
+    const c = td[corner] || {};
+    const v = c[pt];
+    return (v == null ? '' : String(v));
+  }
+  function dmpv(axle, field) {
+    const d = st[axle] || {};
+    const v = d[field];
+    return (v == null ? '' : String(v));
+  }
+
+  const headers = [
+    // Setup fields (session-level, repeated per log)
+    'VCU版本','轮胎类型','轮胎编号',
+    'FL胎深P1','FL胎深P2','FL胎深P3','FR胎深P1','FR胎深P2','FR胎深P3',
+    'RL胎深P1','RL胎深P2','RL胎深P3','RR胎深P1','RR胎深P2','RR胎深P3',
+    '前轮Camber','后轮Camber','前轮Toe','后轮Toe',
+    '前轮胎压psi','后轮胎压psi','前悬弹簧N/mm','后悬弹簧N/mm',
+    '前HSC','前HSR','前LSC','前LSR','后HSC','后HSR','后LSC','后LSR',
+    'ARB档位','调校备注',
+    // Log fields
+    '日志ID','所属测试','测试时间','填写人','日志创建时间','日志更新时间',
+    '开启时间','测试项目','测试项目(自定义)','车手代号','气温°C','地表温度°C','地面状态',
+    'Rot1','Rot2','Rot3','TC','REG','机械参数更改',
+    '测试前_FL胎压psi','测试前_FR胎压psi','测试前_FL胎温外°C','测试前_FL胎温中°C','测试前_FL胎温内°C',
+    '测试前_FR胎温外°C','测试前_FR胎温中°C','测试前_FR胎温内°C',
+    '测试前_RL胎压psi','测试前_RR胎压psi','测试前_RL胎温外°C','测试前_RL胎温中°C','测试前_RL胎温内°C',
+    '测试前_RR胎温外°C','测试前_RR胎温中°C','测试前_RR胎温内°C',
+    '测试后_FL胎压psi','测试后_FR胎压psi','测试后_FL胎温外°C','测试后_FL胎温中°C','测试后_FL胎温内°C',
+    '测试后_FR胎温外°C','测试后_FR胎温中°C','测试后_FR胎温内°C',
+    '测试后_RL胎压psi','测试后_RR胎压psi','测试后_RL胎温外°C','测试后_RL胎温中°C','测试后_RL胎温内°C',
+    '测试后_RR胎温外°C','测试后_RR胎温中°C','测试后_RR胎温内°C',
+    '圈速列表','备注'
+  ];
+
+  const rows = session.logs.map(l => [
+    // Setup fields
+    sv('vcuVersion'), sv('tireType'), sv('tireNumber'),
+    tdv('fl','p1'), tdv('fl','p2'), tdv('fl','p3'),
+    tdv('fr','p1'), tdv('fr','p2'), tdv('fr','p3'),
+    tdv('rl','p1'), tdv('rl','p2'), tdv('rl','p3'),
+    tdv('rr','p1'), tdv('rr','p2'), tdv('rr','p3'),
+    sv('frontCamber'), sv('rearCamber'), sv('frontToe'), sv('rearToe'),
+    sv('frontPressure'), sv('rearPressure'), sv('frontSpringRate'), sv('rearSpringRate'),
+    dmpv('frontDamper','hsComp'), dmpv('frontDamper','hsReb'), dmpv('frontDamper','lsComp'), dmpv('frontDamper','lsReb'),
+    dmpv('rearDamper','hsComp'), dmpv('rearDamper','hsReb'), dmpv('rearDamper','lsComp'), dmpv('rearDamper','lsReb'),
+    sv('arbSetting'), sv('notes'),
+    // Log fields
+    l.id, session.sessionId, session.testTime, session.logger, l.createdAt, l.updatedAt,
+    l.startTime, l.testItems, l.testItemsCustom, l.driver, l.airTemp, l.surfaceTemp, l.surfaceCondition,
+    l.rot1, l.rot2, l.rot3, l.tc, l.reg, l.mechanicalChanges,
+    l.pre_flPressure, l.pre_frPressure, l.pre_flTempOuter, l.pre_flTempMid, l.pre_flTempInner,
+    l.pre_frTempOuter, l.pre_frTempMid, l.pre_frTempInner,
+    l.pre_rlPressure, l.pre_rrPressure, l.pre_rlTempOuter, l.pre_rlTempMid, l.pre_rlTempInner,
+    l.pre_rrTempOuter, l.pre_rrTempMid, l.pre_rrTempInner,
+    l.post_flPressure, l.post_frPressure, l.post_flTempOuter, l.post_flTempMid, l.post_flTempInner,
+    l.post_frTempOuter, l.post_frTempMid, l.post_frTempInner,
+    l.post_rlPressure, l.post_rrPressure, l.post_rlTempOuter, l.post_rlTempMid, l.post_rlTempInner,
+    l.post_rrTempOuter, l.post_rrTempMid, l.post_rrTempInner,
+    (l.lapTimes||[]).join('; '), l.notes
+  ].map(c => '"' + String(c||'').replace(/"/g,'""') + '"'));
+
+  const BOM = '﻿';
+  const csv = BOM + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, `TestRide_${session.sessionId}.csv`);
+  showToast('📊 CSV 导出成功');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// Toast
+// ============================================================
+let toastTimer;
+function showToast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  clearTimeout(toastTimer);
+  const div = document.createElement('div');
+  div.className = 'toast'; div.textContent = msg;
+  document.body.appendChild(div);
+  toastTimer = setTimeout(() => div.remove(), 2500);
+}
+
+// ============================================================
+// Keyboard Shortcuts
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); saveCurrentLog(); }
+  if (e.ctrlKey && e.key === 'n') { e.preventDefault(); addNewLog(); }
+});
+
+// Redraw tire visual on window resize (orientation change on mobile)
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (appState.mode === 'main') {
+      drawTireVisual('tireCanvasPre', 'pre');
+      drawTireVisual('tireCanvasPost', 'post');
+    }
+  }, 200);
+});
+
+// ============================================================
+// Start
+// ============================================================
+init();
+</script>
+</body>
+</html>

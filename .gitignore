@@ -1,0 +1,7 @@
+# Images / large files not needed for hosting
+*.jpg
+*.png
+*.pdf
+*.pyc
+__pycache__/
+*.egg-info/
