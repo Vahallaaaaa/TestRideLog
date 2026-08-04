@@ -1,5 +1,5 @@
 """
-DIAN Racing Test Ride Log — 生成永久 QR 码（GitHub Pages）
+DIAN Racing Test Ride Log — 生成永久 QR 码（Cloudflare Pages）
 """
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
@@ -8,8 +8,8 @@ import os
 DIR = os.path.dirname(os.path.abspath(__file__))
 QR_PATH = os.path.join(DIR, 'qr-code.png')
 
-# 永久 URL — GitHub Pages，改了文件 push 就会自动更新
-URL = 'https://vahallaaaaa.github.io/TestRideLog/Test%20Ride%20Log.html'
+# 永久 URL — Cloudflare Pages，国内可直连
+URL = 'https://testridelog.pages.dev'
 
 print(f'Generating QR for: {URL}')
 
