@@ -1,7 +1,8 @@
 # Images / large files not needed for hosting
 *.jpg
-*.png
 *.pdf
+# Keep the permanent QR code
+!qr-code.png
 *.pyc
 __pycache__/
 *.egg-info/
