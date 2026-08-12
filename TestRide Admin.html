@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TestRide Admin — 数据分析后台</title>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --surface2: #111111;
+    --border: #2a2a2a;
+    --border2: #3a3a3a;
+    --text: #ffffff;
+    --text2: #909090;
+    --accent: #cc0000;
+    --accent-hover: #e60000;
+    --green: #22c55e;
+    --red-err: #ef4444;
+    --yellow: #eab308;
+    --radius: 3px;
+    --font: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font); line-height: 1.5; min-height: 100vh;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.003) 2px, rgba(255,255,255,0.003) 4px);
+    pointer-events: none; z-index: 0;
+  }
+  .app { position: relative; z-index: 1; }
+
+  /* Header */
+  .header {
+    background: #000; border-bottom: 3px solid var(--accent);
+    padding: 10px 24px; display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap;
+    box-shadow: 0 1px 20px rgba(204,0,0,0.15);
+  }
+  .header .logo {
+    font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .header .logo .sub { font-size: 0.6rem; color: var(--text2); font-weight: 400; letter-spacing: 1px; }
+
+  /* Nav tabs */
+  .nav-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 24px; }
+  .nav-tab {
+    padding: 12px 24px; cursor: pointer; font-size: 0.82rem; font-weight: 500;
+    color: var(--text2); border-bottom: 2px solid transparent; transition: all 0.15s;
+    text-transform: uppercase; letter-spacing: 0.5px; font-family: var(--font);
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-tab .badge {
+    display: inline-block; background: var(--accent); color: #fff; font-size: 0.62rem;
+    padding: 1px 6px; border-radius: 10px; margin-left: 6px; vertical-align: middle;
+  }
+
+  /* Main content */
+  .main { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 20px 24px; margin-bottom: 16px; position: relative;
+  }
+  .card::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1px; background: linear-gradient(90deg, transparent, rgba(204,0,0,0.3), transparent); pointer-events: none; }
+  .card-title {
+    font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .dot { width: 6px; height: 6px; background: var(--accent); display: inline-block; }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 18px; border: 1px solid var(--border2); cursor: pointer;
+    font-size: 0.82rem; font-weight: 500; font-family: var(--font);
+    transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.5px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: transparent; color: var(--silver, #a8a8a8); }
+  .btn-secondary:hover { background: #1a1a1a; color: #fff; }
+  .btn-sm { padding: 5px 12px; font-size: 0.72rem; }
+  .btn-xs { padding: 3px 8px; font-size: 0.65rem; letter-spacing: 0; }
+
+  /* Forms */
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 0.66rem; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--font); font-size: 0.85rem;
+  }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+  .form-row { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.78rem;
+  }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { font-size: 0.65rem; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; background: var(--surface2); position: sticky; top: 0; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--surface2); border: 1px solid var(--border); padding: 16px 20px; text-align: center;
+  }
+  .stat-card .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .stat-card .stat-label { font-size: 0.65rem; color: var(--text2); text-transform: uppercase; margin-top: 4px; }
+
+  /* Import zone */
+  .import-zone {
+    border: 2px dashed var(--border2); padding: 48px 24px; text-align: center;
+    cursor: pointer; transition: all 0.2s; margin-bottom: 20px;
+  }
+  .import-zone:hover, .import-zone.drag-over { border-color: var(--accent); background: rgba(204,0,0,0.03); }
+  .import-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+  .import-zone .hint { font-size: 0.78rem; color: var(--text2); margin-top: 8px; }
+
+  /* Comparison */
+  .compare-table td.diff-better { background: rgba(34,197,94,0.2); color: var(--green); }
+  .compare-table td.diff-worse { background: rgba(239,68,68,0.2); color: var(--red-err); }
+  .compare-table td.diff-same { color: var(--text2); }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; border: 1px solid var(--border2); color: #fff;
+    padding: 12px 24px; font-size: 0.82rem; z-index: 999;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Toggle */
+  .toggle-opt {
+    display: inline-block; padding: 6px 16px; border: 1px solid var(--border); cursor: pointer;
+    font-size: 0.78rem; transition: all 0.15s; margin: 2px;
+  }
+  .toggle-opt.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Vehicle params editor */
+  .param-section { margin-top: 16px; }
+  .param-section .sub-title {
+    font-size: 0.75rem; font-weight: 700; color: var(--silver, #a8a8a8);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+    padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .param-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .param-grid .form-group { margin-bottom: 6px; }
+  .param-grid .form-group input { padding: 6px 8px; font-size: 0.8rem; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .main { padding: 12px; }
+    .header { padding: 8px 12px; }
+    .nav-tabs { padding: 0 12px; gap: 0; overflow-x: auto; }
+    .nav-tab { padding: 10px 14px; font-size: 0.7rem; }
+    .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
+    .param-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    TEST RIDE <span style="color:var(--accent);">ADMIN</span>
+    <span class="sub">数据分析后台</span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-secondary btn-sm" onclick="clearAllData()">🗑 清空所有数据</button>
+    <button class="btn btn-secondary btn-sm" onclick="exportAllCSV()">📥 导出全部 CSV</button>
+  </div>
+</header>
+
+<!-- Nav -->
+<nav class="nav-tabs">
+  <div class="nav-tab active" data-view="dashboard" onclick="switchView('dashboard')">📊 概览</div>
+  <div class="nav-tab" data-view="import" onclick="switchView('import')">📥 导入</div>
+  <div class="nav-tab" data-view="browse" onclick="switchView('browse')">📋 浏览</div>
+  <div class="nav-tab" data-view="compare" onclick="switchView('compare')">📈 对比</div>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+  <!-- ======== Dashboard ======== -->
+  <div class="view active" id="view-dashboard">
+    <div class="stats-grid" id="dashboardStats"></div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>最近导入</div>
+      <div id="recentSessions"></div>
+    </div>
+  </div>
+
+  <!-- ======== Import ======== -->
+  <div class="view" id="view-import">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>导入 CSV</div>
+      <div class="import-zone" id="importZone" onclick="document.getElementById('csvFileInput').click()">
+        <div class="icon">📁</div>
+        <div>点击选择或拖拽 CSV 文件到此处</div>
+        <div class="hint">支持 TestRide 导出的 CSV 格式 · 可批量导入多个文件</div>
+      </div>
+      <input type="file" id="csvFileInput" accept=".csv" multiple style="display:none;" onchange="handleCSVFiles(event.target.files)">
+      <div id="importResult"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>导入历史</div>
+      <div id="importHistory"></div>
+    </div>
+  </div>
+
+  <!-- ======== Browse ======== -->
+  <div class="view" id="view-browse">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>会话列表 <span style="font-size:0.65rem;color:var(--text2);font-weight:400;">点击行展开详情</span></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="browseSearch" placeholder="搜索车手/测试项目/日期..." style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);" oninput="renderBrowseList()">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>测试日期</th><th>填写人</th><th>日志数</th><th>车手</th><th>测试项目</th><th>导入时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="browseTable"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Detail panel -->
+    <div id="browseDetail"></div>
+  </div>
+
+  <!-- ======== Compare ======== -->
+  <div class="view" id="view-compare">
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>多日志对比</div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <span style="font-size:0.72rem;color:var(--text2);">选择要对比的日志：</span>
+        <button class="btn btn-secondary btn-sm" onclick="selectAllLogsForCompare()">全选</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearCompareSelection()">清空</button>
+        <span style="font-size:0.72rem;color:var(--text2);margin-left:8px;" id="compareCount">已选 0 条</span>
+      </div>
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+        <table>
+          <thead><tr>
+            <th>选择</th><th>会话</th><th>日志</th><th>车手</th><th>测试项目</th><th>圈速</th><th>日期</th>
+          </tr></thead>
+          <tbody id="compareSelector"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-primary" onclick="runComparison()">🔍 开始对比</button>
+      </div>
+    </div>
+    <div id="compareResult"></div>
+  </div>
+
+</div><!-- .main -->
+</div><!-- .app -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// Data Layer — IndexedDB
+// ============================================================
+const DB_NAME = 'TestRideAdminDB';
+const DB_VER = 1;
+const STORE = 'sessions';
+
+function dbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'dbId' });
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbPut(session) {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    if (!session.dbId) session.dbId = session.sessionId + '_' + Date.now();
+    session.importedAt = session.importedAt || new Date().toISOString();
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(session);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function dbGetAll() {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => { db.close(); resolve(req.result || []); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+
+async function dbDelete(dbId) {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(dbId);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function dbClear() {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function dbUpdateSession(dbId, updateFn) {
+  const db = await dbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(dbId);
+    req.onsuccess = () => {
+      const session = req.result;
+      if (!session) { db.close(); reject(new Error('not found')); return; }
+      updateFn(session);
+      store.put(session);
+      tx.oncomplete = () => { db.close(); resolve(session); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+
+// ============================================================
+// CSV Parser
+// ============================================================
+function parseCSV(text) {
+  // Parse CSV with BOM handling, quoted fields, escaped quotes
+  const BOM = '﻿';
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const rows = [];
+  let row = []; let field = ''; let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\n') { row.push(field); field = ''; if (row.length > 1) rows.push(row); row = []; }
+      else { field += ch; }
+    }
+  }
+  row.push(field);
+  if (row.length > 1) rows.push(row);
+
+  return rows;
+}
+
+function csvToSessions(rows) {
+  if (rows.length < 2) return [];
+  const header = rows[0];
+  const idx = (name) => header.indexOf(name);
+
+  // Group rows by sessionId (column index 18 after log ID)
+  const groups = new Map();
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    const sid = row[idx('所属测试')] || '';
+    if (!sid) continue;
+    if (!groups.has(sid)) groups.set(sid, []);
+    groups.get(sid).push(row);
+  }
+
+  const sessions = [];
+  for (const [sid, logRows] of groups) {
+    const first = logRows[0];
+    const g = (n) => (first[idx(n)] || '').trim();
+
+    // Parse tread depth
+    function td(corner, pt) { return g(corner + '胎深' + pt) || ''; }
+
+    const setup = {
+      vcuVersion: g('VCU版本'),
+      tireType: g('轮胎类型'),
+      tireNumber: g('轮胎编号'),
+      treadDepth: {
+        fl: { p1: td('FL','P1'), p2: td('FL','P2'), p3: td('FL','P3') },
+        fr: { p1: td('FR','P1'), p2: td('FR','P2'), p3: td('FR','P3') },
+        rl: { p1: td('RL','P1'), p2: td('RL','P2'), p3: td('RL','P3') },
+        rr: { p1: td('RR','P1'), p2: td('RR','P2'), p3: td('RR','P3') }
+      },
+      frontCamber: g('前轮Camber'), rearCamber: g('后轮Camber'),
+      frontToe: g('前轮Toe'), rearToe: g('后轮Toe'),
+      frontPressure: g('前轮胎压psi'), rearPressure: g('后轮胎压psi'),
+      frontSpringRate: g('前悬弹簧N/mm'), rearSpringRate: g('后悬弹簧N/mm'),
+      frontDamper: { hsComp: g('前HSC'), hsReb: g('前HSR'), lsComp: g('前LSC'), lsReb: g('前LSR') },
+      rearDamper: { hsComp: g('后HSC'), hsReb: g('后HSR'), lsComp: g('后LSC'), lsReb: g('后LSR') },
+      arbSetting: g('ARB档位'),
+      notes: g('调校备注')
+    };
+
+    const logs = logRows.map(row => {
+      const v = (n) => (row[idx(n)] || '').trim();
+      const lapStr = v('圈速列表');
+      return {
+        id: v('日志ID'),
+        createdAt: v('日志创建时间'),
+        updatedAt: v('日志更新时间'),
+        startTime: v('开启时间'),
+        testItems: v('测试项目'),
+        testItemsCustom: v('测试项目(自定义)'),
+        driver: v('车手代号'),
+        airTemp: v('气温°C'),
+        surfaceTemp: v('地表温度°C'),
+        surfaceCondition: v('地面状态'),
+        rot1: v('Rot1'), rot2: v('Rot2'), rot3: v('Rot3'),
+        tc: v('TC'), reg: v('REG'),
+        mechanicalChanges: v('机械参数更改'),
+        pre_flPressure: v('测试前_FL胎压psi'), pre_frPressure: v('测试前_FR胎压psi'),
+        pre_flTempOuter: v('测试前_FL胎温外°C'), pre_flTempMid: v('测试前_FL胎温中°C'), pre_flTempInner: v('测试前_FL胎温内°C'),
+        pre_frTempOuter: v('测试前_FR胎温外°C'), pre_frTempMid: v('测试前_FR胎温中°C'), pre_frTempInner: v('测试前_FR胎温内°C'),
+        pre_rlPressure: v('测试前_RL胎压psi'), pre_rrPressure: v('测试前_RR胎压psi'),
+        pre_rlTempOuter: v('测试前_RL胎温外°C'), pre_rlTempMid: v('测试前_RL胎温中°C'), pre_rlTempInner: v('测试前_RL胎温内°C'),
+        pre_rrTempOuter: v('测试前_RR胎温外°C'), pre_rrTempMid: v('测试前_RR胎温中°C'), pre_rrTempInner: v('测试前_RR胎温内°C'),
+        post_flPressure: v('测试后_FL胎压psi'), post_frPressure: v('测试后_FR胎压psi'),
+        post_flTempOuter: v('测试后_FL胎温外°C'), post_flTempMid: v('测试后_FL胎温中°C'), post_flTempInner: v('测试后_FL胎温内°C'),
+        post_frTempOuter: v('测试后_FR胎温外°C'), post_frTempMid: v('测试后_FR胎温中°C'), post_frTempInner: v('测试后_FR胎温内°C'),
+        post_rlPressure: v('测试后_RL胎压psi'), post_rrPressure: v('测试后_RR胎压psi'),
+        post_rlTempOuter: v('测试后_RL胎温外°C'), post_rlTempMid: v('测试后_RL胎温中°C'), post_rlTempInner: v('测试后_RL胎温内°C'),
+        post_rrTempOuter: v('测试后_RR胎温外°C'), post_rrTempMid: v('测试后_RR胎温中°C'), post_rrTempInner: v('测试后_RR胎温内°C'),
+        lapTimes: lapStr ? lapStr.split(';').map(s => s.trim()).filter(Boolean) : [],
+        notes: v('备注'),
+        attachments: [],
+        vehicleParams: null  // 手动设置的本次车辆参数
+      };
+    });
+
+    sessions.push({
+      sessionId: sid,
+      testTime: g('测试时间'),
+      logger: g('填写人'),
+      createdAt: logs[0] ? logs[0].createdAt : '',
+      setup: setup,
+      logs: logs
+    });
+  }
+
+  return sessions;
+}
+
+// ============================================================
+// Toast
+// ============================================================
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// View switching
+// ============================================================
+let currentView = 'dashboard';
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'import') renderImportHistory();
+  if (view === 'browse') renderBrowseList();
+  if (view === 'compare') renderCompareSelector();
+}
+
+// ============================================================
+// CSV Import
+// ============================================================
+async function handleCSVFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+  let imported = 0; let skipped = 0;
+  const resultDiv = document.getElementById('importResult');
+  resultDiv.innerHTML = '<div style="padding:12px;color:var(--text2);">解析中...</div>';
+
+  for (const file of files) {
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      const sessions = csvToSessions(rows);
+      for (const s of sessions) {
+        const existing = await dbGetAll();
+        const dup = existing.find(e => e.sessionId === s.sessionId);
+        if (dup) { skipped++; continue; }
+        await dbPut(s);
+        imported++;
+      }
+    } catch (e) {
+      console.error('CSV parse error:', file.name, e);
+      skipped++;
+    }
+  }
+
+  resultDiv.innerHTML = '' +
+    '<div style="padding:12px;border:1px solid var(--green);color:var(--green);margin-top:8px;">' +
+    '✅ 导入完成 — 新增 ' + imported + ' 个会话' + (skipped ? '，跳过 ' + skipped + ' 个（重复或解析失败）' : '') +
+    '</div>';
+  document.getElementById('csvFileInput').value = '';
+  renderImportHistory();
+  renderDashboard();
+}
+
+// Setup drag & drop
+document.getElementById('importZone').addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+});
+document.getElementById('importZone').addEventListener('dragleave', (e) => {
+  e.currentTarget.classList.remove('drag-over');
+});
+document.getElementById('importZone').addEventListener('drop', (e) => {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) handleCSVFiles(e.dataTransfer.files);
+});
+
+// ============================================================
+// Dashboard
+// ============================================================
+async function renderDashboard() {
+  const sessions = await dbGetAll();
+  const totalLogs = sessions.reduce((s, ses) => s + ses.logs.length, 0);
+  const drivers = new Set();
+  const testItems = new Set();
+  sessions.forEach(s => s.logs.forEach(l => {
+    if (l.driver) drivers.add(l.driver);
+    if (l.testItems) testItems.add(l.testItems);
+  }));
+
+  document.getElementById('dashboardStats').innerHTML = '' +
+    '<div class="stat-card"><div class="stat-value">' + sessions.length + '</div><div class="stat-label">导入会话</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + totalLogs + '</div><div class="stat-label">日志总数</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + drivers.size + '</div><div class="stat-label">不同车手</div></div>' +
+    '<div class="stat-card"><div class="stat-value">' + testItems.size + '</div><div class="stat-label">测试项目类型</div></div>';
+
+  const recent = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || '')).slice(0, 5);
+  document.getElementById('recentSessions').innerHTML = recent.length
+    ? '<table><thead><tr><th>会话 ID</th><th>日期</th><th>填写人</th><th>日志数</th><th>导入时间</th></tr></thead><tbody>' +
+      recent.map(s => '' +
+        '<tr style="cursor:pointer;" onclick="switchView(\'browse\');setTimeout(()=>showSessionDetail(\'' + s.dbId + '\'),100)">' +
+        '<td>' + esc(s.sessionId) + '</td>' +
+        '<td>' + esc(s.testTime) + '</td>' +
+        '<td>' + esc(s.logger) + '</td>' +
+        '<td>' + s.logs.length + '</td>' +
+        '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
+        '</tr>').join('') + '</tbody></table>'
+    : '<div style="color:var(--text2);padding:12px;">暂无数据，请先导入 CSV</div>';
+}
+
+// ============================================================
+// Import History
+// ============================================================
+async function renderImportHistory() {
+  const sessions = await dbGetAll();
+  const sorted = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || ''));
+  document.getElementById('importHistory').innerHTML = sorted.length
+    ? '<table><thead><tr><th>会话 ID</th><th>测试日期</th><th>填写人</th><th>日志数</th><th>导入时间</th><th>操作</th></tr></thead><tbody>' +
+      sorted.map(s => '' +
+        '<tr>' +
+        '<td>' + esc(s.sessionId) + '</td>' +
+        '<td>' + esc(s.testTime) + '</td>' +
+        '<td>' + esc(s.logger) + '</td>' +
+        '<td>' + s.logs.length + '</td>' +
+        '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
+        '<td><button class="btn btn-secondary btn-xs" onclick="deleteSession(\'' + s.dbId + '\')">删除</button></td>' +
+        '</tr>').join('') + '</tbody></table>'
+    : '<div style="color:var(--text2);padding:12px;">暂无导入记录</div>';
+}
+
+async function deleteSession(dbId) {
+  if (!confirm('确定删除此会话？')) return;
+  await dbDelete(dbId);
+  renderImportHistory();
+  renderDashboard();
+  showToast('已删除');
+}
+
+async function clearAllData() {
+  if (!confirm('确定清空所有导入数据？此操作不可撤销。')) return;
+  await dbClear();
+  renderDashboard();
+  renderImportHistory();
+  renderBrowseList();
+  showToast('已清空所有数据');
+}
+
+// ============================================================
+// Browse
+// ============================================================
+let browseSearchTerm = '';
+async function renderBrowseList() {
+  browseSearchTerm = (document.getElementById('browseSearch')?.value || '').toLowerCase();
+  const sessions = await dbGetAll();
+  const sorted = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || ''));
+
+  const filtered = browseSearchTerm
+    ? sorted.filter(s =>
+        s.sessionId.toLowerCase().includes(browseSearchTerm) ||
+        s.logger.toLowerCase().includes(browseSearchTerm) ||
+        s.testTime.toLowerCase().includes(browseSearchTerm) ||
+        s.logs.some(l => l.driver.toLowerCase().includes(browseSearchTerm) || l.testItems.toLowerCase().includes(browseSearchTerm)))
+    : sorted;
+
+  document.getElementById('browseTable').innerHTML = filtered.length
+    ? filtered.map(s => {
+        const drivers = [...new Set(s.logs.map(l => l.driver).filter(Boolean))];
+        const items = [...new Set(s.logs.map(l => l.testItems).filter(Boolean))];
+        return '' +
+          '<tr style="cursor:pointer;" onclick="showSessionDetail(\'' + s.dbId + '\')">' +
+          '<td>' + esc(s.testTime) + '</td>' +
+          '<td>' + esc(s.logger) + '</td>' +
+          '<td>' + s.logs.length + '</td>' +
+          '<td>' + esc(drivers.join(', ')) + '</td>' +
+          '<td>' + esc(items.join(', ')) + '</td>' +
+          '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
+          '<td><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();deleteSession(\'' + s.dbId + '\')">删除</button></td>' +
+          '</tr>';
+      }).join('')
+    : '<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:24px;">暂无数据</td></tr>';
+}
+
+async function showSessionDetail(dbId) {
+  const sessions = await dbGetAll();
+  const s = sessions.find(x => x.dbId === dbId);
+  if (!s) return;
+
+  const st = s.setup || {};
+  const sv = (k) => (st[k] == null ? '' : String(st[k])).replace(/"/g, '&quot;');
+  const tdv = (c, p) => { const td = st.treadDepth || {}; const cc = td[c] || {}; return (cc[p] == null ? '' : String(cc[p])); };
+  const dmv = (a, f) => { const d = st[a] || {}; return (d[f] == null ? '' : String(d[f])); };
+
+  document.getElementById('browseDetail').innerHTML = '' +
+    '<div class="card" style="margin-top:16px;">' +
+      '<div class="card-title"><span class="dot"></span>会话详情 — ' + esc(s.sessionId) + '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">' +
+        // Setup summary
+        '<div>' +
+          '<div style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:8px;">调校状态</div>' +
+          '<table style="font-size:0.72rem;">' +
+            '<tr><td style="color:var(--text2);">VCU</td><td>' + esc(sv('vcuVersion')) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">轮胎</td><td>' + esc(sv('tireType') + (sv('tireNumber') ? ' #' + sv('tireNumber') : '')) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">前Camber</td><td>' + esc(sv('frontCamber')) + '°</td></tr>' +
+            '<tr><td style="color:var(--text2);">后Camber</td><td>' + esc(sv('rearCamber')) + '°</td></tr>' +
+            '<tr><td style="color:var(--text2);">前Toe</td><td>' + esc(sv('frontToe')) + '°</td></tr>' +
+            '<tr><td style="color:var(--text2);">后Toe</td><td>' + esc(sv('rearToe')) + '°</td></tr>' +
+            '<tr><td style="color:var(--text2);">胎压 F/R</td><td>' + esc(sv('frontPressure')) + ' / ' + esc(sv('rearPressure')) + ' psi</td></tr>' +
+            '<tr><td style="color:var(--text2);">弹簧 F/R</td><td>' + esc(sv('frontSpringRate')) + ' / ' + esc(sv('rearSpringRate')) + ' N/mm</td></tr>' +
+            '<tr><td style="color:var(--text2);">ARB</td><td>' + esc(sv('arbSetting')) + '</td></tr>' +
+          '</table>' +
+        '</div>' +
+        // Logs list
+        '<div>' +
+          '<div style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:8px;">日志列表 (' + s.logs.length + ' 条)</div>' +
+          s.logs.map((l, i) => {
+            const best = l.lapTimes.length ? l.lapTimes.reduce((a, b) => (a && a < b) ? a : b, l.lapTimes[0]) : '-';
+            return '' +
+              '<div style="padding:8px 12px;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;" ' +
+                   'onclick="showLogDetail(\'' + dbId + '\',\'' + l.id + '\')">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                  '<strong>#' + (i + 1) + ' ' + esc(l.driver || '未命名') + '</strong>' +
+                  '<span style="font-size:0.7rem;color:var(--text2);">' + esc(l.testItems || '') + '</span>' +
+                '</div>' +
+                '<div style="font-size:0.68rem;color:var(--text2);margin-top:4px;">' +
+                  '最佳圈速: ' + esc(best) + ' | 胎温前: ' + esc(l.pre_flTempMid || '-') + '°C | 气压: ' + esc(l.pre_flPressure || '-') + 'psi' +
+                '</div>' +
+                (l.vehicleParams ? '<div style="font-size:0.62rem;color:var(--green);margin-top:2px;">已设定车辆参数</div>' : '') +
+              '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:8px;"><button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'browseDetail\').innerHTML=\'\'">关闭详情</button></div>' +
+    '</div>';
+
+  document.getElementById('browseDetail').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============================================================
+// Log Detail — full view with vehicle params editor
+// ============================================================
+async function showLogDetail(dbId, logId) {
+  const sessions = await dbGetAll();
+  const s = sessions.find(x => x.dbId === dbId);
+  if (!s) return;
+  const log = s.logs.find(l => l.id === logId);
+  if (!log) return;
+
+  const st = s.setup || {};
+  const vp = log.vehicleParams || {};
+
+  function escV(obj, key) { const v = obj[key]; return (v == null ? '' : String(v)).replace(/"/g, '&quot;'); }
+  function vpV(key) { return escV(vp, key); }
+  function formatLap(l) { return l || '-'; }
+
+  const bestLap = log.lapTimes && log.lapTimes.length
+    ? log.lapTimes.filter(Boolean).reduce((a, b) => (String(a||'').localeCompare(String(b||'')) < 0) ? a : b, log.lapTimes[0])
+    : '-';
+
+  // Vehicle params form (pre-fill from setup as defaults)
+  const DEF = (field, alt) => (vp[field] != null && vp[field] !== '') ? escV(vp, field) : ((st[field] != null && st[field] !== '') ? escV(st, field) : alt || '');
+
+  const damperFields = [
+    { key: 'hsComp', label: '高速压缩 HSC' },
+    { key: 'hsReb', label: '高速回弹 HSR' },
+    { key: 'lsComp', label: '低速压缩 LSC' },
+    { key: 'lsReb', label: '低速回弹 LSR' }
+  ];
+
+  const fdVp = vp.frontDamper || {};
+  const rdVp = vp.rearDamper || {};
+  const fdSt = st.frontDamper || {};
+  const rdSt = st.rearDamper || {};
+
+  function damperVal(axleVp, axleSt, field) {
+    if (axleVp[field] != null && axleVp[field] !== '') return String(axleVp[field]);
+    if (axleSt[field] != null && axleSt[field] !== '') return String(axleSt[field]);
+    return '';
+  }
+
+  document.getElementById('browseDetail').innerHTML = '' +
+    '<div class="card" style="margin-top:16px;">' +
+      '<div class="card-title"><span class="dot"></span>日志详情 — ' + esc(log.driver || log.id) + '</div>' +
+
+      // --- Basic Info ---
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;">' +
+        '<div>' +
+          '<div class="sub-title" style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px;">基本信息</div>' +
+          '<table style="font-size:0.75rem;">' +
+            '<tr><td style="color:var(--text2);width:100px;">日志 ID</td><td>' + esc(log.id) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">车手代号</td><td>' + esc(log.driver) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">测试项目</td><td>' + esc(log.testItems) + (log.testItemsCustom ? ' (' + esc(log.testItemsCustom) + ')' : '') + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">气温</td><td>' + esc(log.airTemp) + '°C</td></tr>' +
+            '<tr><td style="color:var(--text2);">地表温度</td><td>' + esc(log.surfaceTemp) + '°C</td></tr>' +
+            '<tr><td style="color:var(--text2);">地面状态</td><td>' + esc(log.surfaceCondition) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">Rot 1/2/3</td><td>' + esc(log.rot1) + ' / ' + esc(log.rot2) + ' / ' + esc(log.rot3) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">TC / REG</td><td>' + esc(log.tc) + ' / ' + esc(log.reg) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">最佳圈速</td><td style="font-weight:700;color:var(--accent);">' + esc(bestLap) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">机械更改</td><td>' + esc(log.mechanicalChanges || '无') + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">备注</td><td>' + esc(log.notes || '无') + '</td></tr>' +
+          '</table>' +
+        '</div>' +
+
+        // --- Tire Pre ---
+        '<div>' +
+          '<div class="sub-title" style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px;">测试前轮胎</div>' +
+          '<table style="font-size:0.72rem;">' +
+            '<tr><th></th><th>胎压 psi</th><th>外°C</th><th>中°C</th><th>内°C</th></tr>' +
+            '<tr><td>FL</td><td>' + esc(log.pre_flPressure) + '</td><td>' + esc(log.pre_flTempOuter) + '</td><td>' + esc(log.pre_flTempMid) + '</td><td>' + esc(log.pre_flTempInner) + '</td></tr>' +
+            '<tr><td>FR</td><td>' + esc(log.pre_frPressure) + '</td><td>' + esc(log.pre_frTempOuter) + '</td><td>' + esc(log.pre_frTempMid) + '</td><td>' + esc(log.pre_frTempInner) + '</td></tr>' +
+            '<tr><td>RL</td><td>' + esc(log.pre_rlPressure) + '</td><td>' + esc(log.pre_rlTempOuter) + '</td><td>' + esc(log.pre_rlTempMid) + '</td><td>' + esc(log.pre_rlTempInner) + '</td></tr>' +
+            '<tr><td>RR</td><td>' + esc(log.pre_rrPressure) + '</td><td>' + esc(log.pre_rrTempOuter) + '</td><td>' + esc(log.pre_rrTempMid) + '</td><td>' + esc(log.pre_rrTempInner) + '</td></tr>' +
+          '</table>' +
+          '<div class="sub-title" style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-top:12px;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:4px;">测试后轮胎</div>' +
+          '<table style="font-size:0.72rem;">' +
+            '<tr><th></th><th>胎压 psi</th><th>外°C</th><th>中°C</th><th>内°C</th></tr>' +
+            '<tr><td>FL</td><td>' + esc(log.post_flPressure) + '</td><td>' + esc(log.post_flTempOuter) + '</td><td>' + esc(log.post_flTempMid) + '</td><td>' + esc(log.post_flTempInner) + '</td></tr>' +
+            '<tr><td>FR</td><td>' + esc(log.post_frPressure) + '</td><td>' + esc(log.post_frTempOuter) + '</td><td>' + esc(log.post_frTempMid) + '</td><td>' + esc(log.post_frTempInner) + '</td></tr>' +
+            '<tr><td>RL</td><td>' + esc(log.post_rlPressure) + '</td><td>' + esc(log.post_rlTempOuter) + '</td><td>' + esc(log.post_rlTempMid) + '</td><td>' + esc(log.post_rlTempInner) + '</td></tr>' +
+            '<tr><td>RR</td><td>' + esc(log.post_rrPressure) + '</td><td>' + esc(log.post_rrTempOuter) + '</td><td>' + esc(log.post_rrTempMid) + '</td><td>' + esc(log.post_rrTempInner) + '</td></tr>' +
+          '</table>' +
+          (log.lapTimes && log.lapTimes.length ? '<div style="margin-top:8px;"><span style="color:var(--text2);font-size:0.65rem;">圈速:</span> ' + log.lapTimes.map((t,i) => '<span style="font-size:0.7rem;">#'+(i+1)+' <strong>'+esc(t)+'</strong></span>').join(' &nbsp;') + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+
+      // --- Vehicle Parameters Editor ---
+      '<div class="param-section" style="margin-top:24px;">' +
+        '<div class="sub-title" style="font-size:0.85rem;font-weight:700;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:6px;">车辆参数 Vehicle Params <span style="font-size:0.62rem;color:var(--text2);font-weight:400;">— 本次日志对应的车辆设定（编辑后自动保存）</span></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;margin-top:12px;">' +
+
+          // Powertrain
+          '<div>' +
+            '<div class="sub-title">动力 Powertrain</div>' +
+            '<div class="param-grid">' +
+              '<div class="form-group"><label>VCU 版本</label><input type="text" data-vp="vcuVersion" value="' + DEF('vcuVersion') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+            '</div>' +
+          '</div>' +
+
+          // Tire
+          '<div>' +
+            '<div class="sub-title">轮胎 Tyre</div>' +
+            '<div class="param-grid">' +
+              '<div class="form-group"><label>轮胎类型</label><input type="text" data-vp="tireType" value="' + DEF('tireType') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="干胎/雨胎"></div>' +
+              '<div class="form-group"><label>轮胎编号</label><input type="text" data-vp="tireNumber" value="' + DEF('tireNumber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="1-4"></div>' +
+              '<div class="form-group"><label>前胎压 psi</label><input type="text" data-vp="frontPressure" value="' + DEF('frontPressure') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后胎压 psi</label><input type="text" data-vp="rearPressure" value="' + DEF('rearPressure') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+            '</div>' +
+          '</div>' +
+
+          // Alignment
+          '<div>' +
+            '<div class="sub-title">定位角度 Alignment (°)</div>' +
+            '<div class="param-grid">' +
+              '<div class="form-group"><label>前轮 Camber</label><input type="text" data-vp="frontCamber" value="' + DEF('frontCamber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后轮 Camber</label><input type="text" data-vp="rearCamber" value="' + DEF('rearCamber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>前轮 Toe</label><input type="text" data-vp="frontToe" value="' + DEF('frontToe') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后轮 Toe</label><input type="text" data-vp="rearToe" value="' + DEF('rearToe') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+            '</div>' +
+          '</div>' +
+
+          // Suspension
+          '<div>' +
+            '<div class="sub-title">悬架 Suspension</div>' +
+            '<div class="param-grid">' +
+              '<div class="form-group"><label>前弹簧 N/mm</label><input type="text" data-vp="frontSpringRate" value="' + DEF('frontSpringRate') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后弹簧 N/mm</label><input type="text" data-vp="rearSpringRate" value="' + DEF('rearSpringRate') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>ARB 档位</label><input type="text" data-vp="arbSetting" value="' + DEF('arbSetting') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="1-6"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Dampers
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;">' +
+          '<div>' +
+            '<div class="sub-title">前悬阻尼 Front Damper</div>' +
+            '<div class="param-grid">' +
+              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="frontDamper_' + df.key + '" value="' + damperVal(fdVp, fdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>').join('') +
+            '</div>' +
+          '</div>' +
+          '<div>' +
+            '<div class="sub-title">后悬阻尼 Rear Damper</div>' +
+            '<div class="param-grid">' +
+              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="rearDamper_' + df.key + '" value="' + damperVal(rdVp, rdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>').join('') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Notes
+        '<div class="form-group" style="margin-top:12px;">' +
+          '<label>车辆参数备注</label>' +
+          '<textarea data-vp="vpNotes" rows="2" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="额外的车辆设定说明...">' + (vp.vpNotes || '').replace(/"/g,'&quot;') + '</textarea>' +
+        '</div>' +
+
+        '<div style="margin-top:8px;font-size:0.62rem;color:var(--text2);">修改任意字段后自动保存 · 默认值为会话初始调校</div>' +
+      '</div>' +
+
+      // Session setup reference
+      '<div style="margin-top:16px;font-size:0.65rem;color:var(--text2);border-top:1px solid var(--border);padding-top:8px;">' +
+        '📌 会话初始调校参考: VCU ' + esc(st.vcuVersion || '-') +
+        ' | 轮胎 ' + esc(st.tireType || '-') + (st.tireNumber ? ' #' + esc(st.tireNumber) : '') +
+        ' | Camber F:' + esc(st.frontCamber || '-') + '° R:' + esc(st.rearCamber || '-') + '°' +
+        ' | 弹簧 F:' + esc(st.frontSpringRate || '-') + ' R:' + esc(st.rearSpringRate || '-') + ' N/mm' +
+        ' | ARB ' + esc(st.arbSetting || '-') +
+      '</div>' +
+
+      '<div style="margin-top:12px;">' +
+        '<button class="btn btn-secondary btn-sm" onclick="showSessionDetail(\'' + dbId + '\')">← 返回会话详情</button>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('browseDetail').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============================================================
+// Vehicle Params — save per-log
+// ============================================================
+async function saveVehicleParam(dbId, logId) {
+  await dbUpdateSession(dbId, (session) => {
+    const log = session.logs.find(l => l.id === logId);
+    if (!log) return;
+    if (!log.vehicleParams) log.vehicleParams = {};
+
+    // Collect simple fields
+    const simpleKeys = ['vcuVersion','tireType','tireNumber','frontCamber','rearCamber','frontToe','rearToe',
+                        'frontPressure','rearPressure','frontSpringRate','rearSpringRate','arbSetting','vpNotes'];
+    for (const key of simpleKeys) {
+      const el = document.querySelector('[data-vp="' + key + '"]');
+      if (el) log.vehicleParams[key] = el.value;
+    }
+
+    // Damper fields
+    if (!log.vehicleParams.frontDamper) log.vehicleParams.frontDamper = {};
+    if (!log.vehicleParams.rearDamper) log.vehicleParams.rearDamper = {};
+    ['hsComp','hsReb','lsComp','lsReb'].forEach(f => {
+      const fel = document.querySelector('[data-vp="frontDamper_' + f + '"]');
+      if (fel) log.vehicleParams.frontDamper[f] = fel.value;
+      const rel = document.querySelector('[data-vp="rearDamper_' + f + '"]');
+      if (rel) log.vehicleParams.rearDamper[f] = rel.value;
+    });
+  });
+}
+
+// ============================================================
+// Compare
+// ============================================================
+let compareSelection = new Set();
+
+async function renderCompareSelector() {
+  const sessions = await dbGetAll();
+  let html = '';
+  for (const s of sessions) {
+    for (const log of s.logs) {
+      const key = s.dbId + '|' + log.id;
+      const checked = compareSelection.has(key) ? 'checked' : '';
+      const best = (log.lapTimes || []).filter(Boolean).sort()[0] || '-';
+      html += '' +
+        '<tr>' +
+        '<td><input type="checkbox" ' + checked + ' onchange="toggleCompareSelection(\'' + key + '\',this.checked)"></td>' +
+        '<td>' + esc(s.testTime) + '</td>' +
+        '<td>' + esc(log.driver || log.id) + '</td>' +
+        '<td>' + esc(log.driver) + '</td>' +
+        '<td>' + esc(log.testItems || '-') + '</td>' +
+        '<td>' + esc(best) + '</td>' +
+        '<td>' + esc(s.testTime) + '</td>' +
+        '</tr>';
+    }
+  }
+  document.getElementById('compareSelector').innerHTML = html || '<tr><td colspan="7" style="color:var(--text2);padding:24px;">暂无数据</td></tr>';
+  updateCompareCount();
+}
+
+function toggleCompareSelection(key, checked) {
+  if (checked) compareSelection.add(key); else compareSelection.delete(key);
+  updateCompareCount();
+}
+
+function updateCompareCount() {
+  document.getElementById('compareCount').textContent = '已选 ' + compareSelection.size + ' 条';
+}
+
+function selectAllLogsForCompare() {
+  document.querySelectorAll('#compareSelector input[type="checkbox"]').forEach(cb => {
+    cb.checked = true;
+    compareSelection.add(cb.getAttribute('onchange').match(/'(.*?)'/)[1]);
+  });
+  updateCompareCount();
+}
+
+function clearCompareSelection() {
+  compareSelection.clear();
+  document.querySelectorAll('#compareSelector input[type="checkbox"]').forEach(cb => cb.checked = false);
+  updateCompareCount();
+}
+
+async function runComparison() {
+  if (compareSelection.size < 2) { showToast('请至少选择 2 条日志进行对比'); return; }
+  const sessions = await dbGetAll();
+
+  // Collect selected logs
+  const selected = [];
+  for (const key of compareSelection) {
+    const [dbId, logId] = key.split('|');
+    const s = sessions.find(x => x.dbId === dbId);
+    if (!s) continue;
+    const log = s.logs.find(l => l.id === logId);
+    if (!log) continue;
+    selected.push({ session: s, log: log, key: key });
+  }
+
+  if (selected.length < 2) { showToast('选中的日志数据异常'); return; }
+
+  // Build comparison table
+  const rows = [
+    { label: '车手', get: x => x.log.driver },
+    { label: '测试项目', get: x => x.log.testItems + (x.log.testItemsCustom ? ' (' + x.log.testItemsCustom + ')' : '') },
+    { label: '最佳圈速', get: x => (x.log.lapTimes || []).filter(Boolean).sort()[0] || '-' },
+    { label: '气温 °C', get: x => x.log.airTemp },
+    { label: '地表温度 °C', get: x => x.log.surfaceTemp },
+    { label: '地面状态', get: x => x.log.surfaceCondition },
+    { label: 'Rot1', get: x => x.log.rot1 },
+    { label: 'Rot2', get: x => x.log.rot2 },
+    { label: 'Rot3', get: x => x.log.rot3 },
+    { label: 'TC', get: x => x.log.tc },
+    { label: 'REG', get: x => x.log.reg },
+    { label: '机械更改', get: x => x.log.mechanicalChanges || '-' },
+    // Pre tire
+    { label: '前FL胎压 psi', get: x => x.log.pre_flPressure },
+    { label: '前FR胎压 psi', get: x => x.log.pre_frPressure },
+    { label: '前FL胎温中 °C', get: x => x.log.pre_flTempMid },
+    { label: '前FR胎温中 °C', get: x => x.log.pre_frTempMid },
+    { label: '后RL胎压 psi', get: x => x.log.pre_rlPressure },
+    { label: '后RR胎压 psi', get: x => x.log.pre_rrPressure },
+    { label: '后RL胎温中 °C', get: x => x.log.pre_rlTempMid },
+    { label: '后RR胎温中 °C', get: x => x.log.pre_rrTempMid },
+    // Post tire
+    { label: '后FL胎压 psi', get: x => x.log.post_flPressure },
+    { label: '后FR胎压 psi', get: x => x.log.post_frPressure },
+    { label: '后FL胎温中 °C', get: x => x.log.post_flTempMid },
+    { label: '后FR胎温中 °C', get: x => x.log.post_frTempMid },
+    { label: '后RL胎压 psi', get: x => x.log.post_rlPressure },
+    { label: '后RR胎压 psi', get: x => x.log.post_rrPressure },
+    // Vehicle params
+    { label: '*VCU', get: x => (x.log.vehicleParams || {}).vcuVersion || '-' },
+    { label: '*轮胎类型', get: x => (x.log.vehicleParams || {}).tireType || '-' },
+    { label: '*前Camber°', get: x => (x.log.vehicleParams || {}).frontCamber || '-' },
+    { label: '*后Camber°', get: x => (x.log.vehicleParams || {}).rearCamber || '-' },
+    { label: '*前胎压 psi', get: x => (x.log.vehicleParams || {}).frontPressure || '-' },
+    { label: '*后胎压 psi', get: x => (x.log.vehicleParams || {}).rearPressure || '-' },
+    { label: '*前弹簧 N/mm', get: x => (x.log.vehicleParams || {}).frontSpringRate || '-' },
+    { label: '*后弹簧 N/mm', get: x => (x.log.vehicleParams || {}).rearSpringRate || '-' },
+    { label: '*ARB', get: x => (x.log.vehicleParams || {}).arbSetting || '-' },
+  ];
+
+  // Detect differences
+  function allSame(getter) {
+    const vals = selected.map(s => getter(s));
+    return vals.every(v => v === vals[0]);
+  }
+
+  // Build HTML table
+  let html = '<div class="card" style="margin-top:16px;">' +
+    '<div class="card-title"><span class="dot"></span>对比结果 — ' + selected.length + ' 条日志</div>' +
+    '<div class="table-wrap"><table class="compare-table"><thead><tr><th>指标</th>';
+
+  for (let i = 0; i < selected.length; i++) {
+    html += '<th>' + esc(selected[i].log.driver || '#' + (i+1)) + '<br><span style="font-size:0.55rem;color:var(--text2);">' + esc(selected[i].session.testTime) + '</span></th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const row of rows) {
+    const same = allSame(row.get);
+    html += '<tr><td style="color:var(--text2);font-size:0.7rem;">' + row.label + '</td>';
+    for (let i = 0; i < selected.length; i++) {
+      const val = row.get(selected[i]);
+      if (i === 0 || same) {
+        html += '<td>' + esc(val) + '</td>';
+      } else {
+        const firstVal = row.get(selected[0]);
+        const cls = (firstVal && val && val !== firstVal) ? 'diff-better' : ((firstVal && val && val === firstVal) ? 'diff-same' : '');
+        html += '<td class="' + cls + '">' + esc(val) + '</td>';
+      }
+    }
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>' +
+    '<div style="font-size:0.62rem;color:var(--text2);margin-top:8px;">* 标注为手动设定的车辆参数 · 绿色=与第一列不同</div>' +
+    '</div>';
+
+  document.getElementById('compareResult').innerHTML = html;
+  document.getElementById('compareResult').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDate(iso) {
+  if (!iso) return '-';
+  try { const d = new Date(iso); return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}); }
+  catch { return iso; }
+}
+
+function exportAllCSV() {
+  showToast('请在浏览页面选择会话后导出（功能待扩展）');
+}
+
+// ============================================================
+// Keyboard
+// ============================================================
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && String(e.key) === '1') { e.preventDefault(); switchView('dashboard'); }
+  if (e.ctrlKey && String(e.key) === '2') { e.preventDefault(); switchView('import'); }
+  if (e.ctrlKey && String(e.key) === '3') { e.preventDefault(); switchView('browse'); }
+  if (e.ctrlKey && String(e.key) === '4') { e.preventDefault(); switchView('compare'); }
+});
+
+// ============================================================
+// Init
+// ============================================================
+renderDashboard();
+</script>
+</body>
+</html>

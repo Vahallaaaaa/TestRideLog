@@ -10,11 +10,12 @@
 
 ```
 TestRide/
-├── Test Ride Log.html    # 主应用（单页 HTML，所有功能在此）
-├── index.html            # 重定向 → Test Ride Log.html
-├── generate-qr.py        # 生成 QR 码脚本
-├── start-tunnel.py       # 本地隧道脚本（备用，一般不需要）
-├── qr-code.png           # 永久 QR 码
+├── Test Ride Log.html      # 主应用（单页 HTML，赛道现场使用）
+├── TestRide Admin.html     # 数据分析后台（CSV 导入 / 对比 / 统计）
+├── index.html              # 重定向 → Test Ride Log.html
+├── generate-qr.py          # 生成 QR 码脚本
+├── start-tunnel.py         # 本地隧道脚本（备用）
+├── qr-code.png             # 永久 QR 码
 └── README.md
 ```
 
@@ -95,6 +96,20 @@ python -m http.server 8000
 - Canvas 2D（轮胎胎压/温度可视化）
 - localStorage（数据持久化）
 - 响应式设计（桌面 + 平板 + 手机）
+
+---
+
+## 数据分析后台
+
+`TestRide Admin.html` — 浏览器本地运行的分析工具，无需服务器。
+
+**功能**：
+- **📥 CSV 导入** — 拖拽或选择 TestRide 导出的 CSV 文件，批量导入
+- **📋 数据浏览** — 会话列表 + 详情，还原原始视图
+- **🔧 车辆参数更新** — 为每条日志手动设定对应的车辆参数（VCU/轮胎/定位/悬架/阻尼）
+- **📈 多日志对比** — 选择 2+ 条日志并排对比，差异高亮
+
+**快捷键**：`Ctrl+1` 概览 · `Ctrl+2` 导入 · `Ctrl+3` 浏览 · `Ctrl+4` 对比
 
 ---
 
