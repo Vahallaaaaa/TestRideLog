@@ -502,9 +502,97 @@
     .tire-input-group-compact { background: #f9f9f9; border: 1px solid #ddd; }
     .tire-input-group-compact .tig-label { color: #000; }
   }
+
+  /* ===== Attachments ===== */
+  .attachments-area { margin-top: 12px; }
+  .attachments-area .section-label {
+    font-size: 0.7rem; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+  }
+  .attachments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .attachment-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .attachment-card:hover { border-color: var(--accent); }
+  .attachment-card .thumb-img {
+    width: 100%; height: 110px; object-fit: cover; display: block; background: #000;
+  }
+  .attachment-card .thumb-video {
+    display: flex; align-items: center; justify-content: center;
+    height: 110px; background: #0a0a0a; color: var(--silver); font-size: 2.4rem;
+  }
+  .attachment-card .file-info {
+    padding: 6px 8px; font-size: 0.62rem; color: var(--text2);
+    display: flex; justify-content: space-between; align-items: center; gap: 4px;
+  }
+  .attachment-card .file-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+  }
+  .attachment-card .file-size { white-space: nowrap; color: #666; }
+  .attachment-card .btn-del-att {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    background: rgba(204,0,0,0.85); color: #fff; border: none;
+    border-radius: 50%; cursor: pointer; font-size: 0.7rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .attachment-card:hover .btn-del-att { opacity: 1; }
+  .upload-btn-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-upload {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; background: transparent;
+    border: 1px dashed var(--border2); color: var(--silver);
+    cursor: pointer; font-size: 0.8rem; font-family: var(--font);
+    transition: all 0.15s;
+  }
+  .btn-upload:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-upload input[type="file"] { display: none; }
+  /* Lightbox */
+  .lightbox-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.94); z-index: 9999;
+    align-items: center; justify-content: center; flex-direction: column;
+  }
+  .lightbox-overlay.show { display: flex; }
+  .lightbox-overlay img, .lightbox-overlay video {
+    max-width: 95vw; max-height: 80vh; border: 1px solid #333;
+  }
+  .lightbox-close {
+    position: absolute; top: 16px; right: 24px;
+    color: #fff; font-size: 2rem; cursor: pointer;
+    background: none; border: none; z-index: 1; opacity: 0.7;
+  }
+  .lightbox-close:hover { opacity: 1; }
+  .lightbox-filename {
+    color: var(--text2); font-size: 0.82rem; margin-top: 12px; max-width: 90vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  @media (max-width: 768px) {
+    .attachments-grid { grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 6px; }
+    .attachment-card .thumb-img, .attachment-card .thumb-video { height: 80px; }
+  }
 </style>
 </head>
 <body>
+
+<!-- Lightbox -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+  <img id="lightboxImg" style="display:none;">
+  <video id="lightboxVid" controls style="display:none;"></video>
+  <div class="lightbox-filename" id="lightboxName"></div>
+</div>
 
 <!-- Header -->
 <header class="app-header">
@@ -578,6 +666,81 @@ function getAppState() {
 }
 
 // ============================================================
+// IndexedDB — file attachment storage (avoids localStorage size limits)
+// ============================================================
+const IDB_NAME = 'TestRideAttachments';
+const IDB_VERSION = 1;
+const IDB_STORE = 'files';
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function idbPut(key, blob) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(blob, key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => { db.close(); resolve(req.result || null); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+
+async function idbDel(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+function idbKey(sessionId, logId, attachmentId) {
+  return sessionId + '_' + logId + '_' + attachmentId;
+}
+
+async function idbDeleteAllForLog(sessionId, logId) {
+  // Delete all files matching sessionId_logId_* prefix
+  const prefix = sessionId + '_' + logId + '_';
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    const req = store.openCursor();
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor) {
+        if (cursor.key.toString().startsWith(prefix)) { cursor.delete(); }
+        cursor.continue();
+      }
+    };
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 function nowId() {
@@ -621,7 +784,8 @@ function getEmptyLog() {
     post_rlTempOuter: '', post_rlTempMid: '', post_rlTempInner: '',
     post_rrTempOuter: '', post_rrTempMid: '', post_rrTempInner: '',
     lapTimes: [],
-    notes: ''
+    notes: '',
+    attachments: []
   };
 }
 
@@ -1404,6 +1568,22 @@ function renderLogForm(log) {
       <label>注：测试过程中的其他观察、异常、调校建议等</label>
       <textarea name="notes" rows="4" placeholder="在此记录测试过程中的发现、问题、建议……">${v('notes')}</textarea>
     </div>
+    <!-- Attachments -->
+    <div class="attachments-area" id="attachmentsArea">
+      <div class="section-label">媒体附件</div>
+      <div class="attachments-grid" id="attachmentsGrid">${renderAttachments(log)}</div>
+      <div class="upload-btn-wrap">
+        <label class="btn-upload">
+          🖼️ 图片
+          <input type="file" accept="image/jpeg,image/png,image/gif,image/webp,image/bmp,image/svg+xml,image/heic,image/heif" multiple onchange="handleFileUpload(event)">
+        </label>
+        <label class="btn-upload">
+          🎬 视频
+          <input type="file" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska" multiple onchange="handleFileUpload(event)">
+        </label>
+      </div>
+      <div style="font-size:0.6rem;color:#555;margin-top:4px;">单个文件最大 50MB，支持图片/视频常用格式</div>
+    </div>
   </div>
 
 </form>
@@ -1422,6 +1602,7 @@ function renderLogForm(log) {
   renderTireInputs(log, 'post');
   setTimeout(() => { drawTireVisual('tireCanvasPre', 'pre'); }, 50);
   setTimeout(() => { drawTireVisual('tireCanvasPost', 'post'); }, 100);
+  setTimeout(() => { loadAttachmentThumbnails(log); }, 150);
 }
 
 // ============================================================
@@ -1958,11 +2139,15 @@ function deleteCurrentLog() {
     return;
   }
 
-  const log = session.logs.find(l => l.id === appState.currentLogId);
+  const logId = appState.currentLogId;
+  const log = session.logs.find(l => l.id === logId);
   const label = log?.driver || log?.id || '当前日志';
   if (!confirm(`确定要删除 "${label}" 吗？\n\n此操作不可撤销。`)) return;
 
-  sessions[sIdx].logs = sessions[sIdx].logs.filter(l => l.id !== appState.currentLogId);
+  // Clean up attachments from IndexedDB
+  idbDeleteAllForLog(appState.currentSessionId, logId).catch(() => {});
+
+  sessions[sIdx].logs = sessions[sIdx].logs.filter(l => l.id !== logId);
   saveAllSessions(sessions);
 
   appState.currentLogId = sessions[sIdx].logs[sessions[sIdx].logs.length - 1].id;
@@ -2032,7 +2217,7 @@ function exportSessionCSV() {
     '测试后_FR胎温外°C','测试后_FR胎温中°C','测试后_FR胎温内°C',
     '测试后_RL胎压psi','测试后_RR胎压psi','测试后_RL胎温外°C','测试后_RL胎温中°C','测试后_RL胎温内°C',
     '测试后_RR胎温外°C','测试后_RR胎温中°C','测试后_RR胎温内°C',
-    '圈速列表','备注'
+    '圈速列表','备注','附件数量','附件文件名'
   ];
 
   const rows = session.logs.map(l => [
@@ -2059,7 +2244,8 @@ function exportSessionCSV() {
     l.post_frTempOuter, l.post_frTempMid, l.post_frTempInner,
     l.post_rlPressure, l.post_rrPressure, l.post_rlTempOuter, l.post_rlTempMid, l.post_rlTempInner,
     l.post_rrTempOuter, l.post_rrTempMid, l.post_rrTempInner,
-    (l.lapTimes||[]).join('; '), l.notes
+    (l.lapTimes||[]).join('; '), l.notes,
+    (l.attachments||[]).length, (l.attachments||[]).map(a => a.name).join('; ')
   ].map(c => '"' + String(c||'').replace(/"/g,'""') + '"'));
 
   const BOM = '﻿';
@@ -2089,6 +2275,191 @@ function showToast(msg) {
   div.className = 'toast'; div.textContent = msg;
   document.body.appendChild(div);
   toastTimer = setTimeout(() => div.remove(), 2500);
+}
+
+// ============================================================
+// Attachments — upload / render / delete / preview
+// ============================================================
+const ATT_MAX_SIZE = 50 * 1024 * 1024; // 50 MB
+const IMG_TYPES = ['image/jpeg','image/png','image/gif','image/webp','image/bmp','image/svg+xml','image/heic','image/heif'];
+const VID_TYPES = ['video/mp4','video/webm','video/quicktime','video/x-msvideo','video/x-matroska'];
+
+function getCurrentLog() {
+  const sessions = getAllSessions();
+  const sIdx = sessions.findIndex(s => s.sessionId === appState.currentSessionId);
+  if (sIdx === -1) return null;
+  const lIdx = sessions[sIdx].logs.findIndex(l => l.id === appState.currentLogId);
+  if (lIdx === -1) return null;
+  return { sessions, sIdx, lIdx, log: sessions[sIdx].logs[lIdx] };
+}
+
+async function handleFileUpload(event) {
+  const files = event.target.files;
+  if (!files || !files.length) return;
+  const result = getCurrentLog();
+  if (!result) return;
+  const { sessions, sIdx, lIdx, log } = result;
+  if (!log.attachments) log.attachments = [];
+
+  const sid = appState.currentSessionId;
+  const lid = appState.currentLogId;
+  let added = 0;
+
+  for (const file of files) {
+    if (file.size > ATT_MAX_SIZE) {
+      showToast('⚠️ ' + file.name + ' 超过 50MB 限制，已跳过');
+      continue;
+    }
+    const attId = 'att' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6);
+    const key = idbKey(sid, lid, attId);
+    try {
+      await idbPut(key, file);
+      log.attachments.push({
+        id: attId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        addedAt: new Date().toISOString()
+      });
+      added++;
+    } catch (err) {
+      console.error('Upload failed:', err);
+      showToast('⚠️ ' + file.name + ' 上传失败');
+    }
+  }
+
+  if (added) {
+    log.updatedAt = new Date().toISOString();
+    sessions[sIdx].logs[lIdx] = log;
+    saveAllSessions(sessions);
+    refreshAttachmentsUI(log);
+    showToast('✅ 已上传 ' + added + ' 个文件');
+  }
+  // Reset input so same file can be re-uploaded
+  event.target.value = '';
+}
+
+async function deleteAttachment(attId, event) {
+  event.stopPropagation();
+  const result = getCurrentLog();
+  if (!result) return;
+  const { sessions, sIdx, lIdx, log } = result;
+  if (!log.attachments) return;
+
+  const att = log.attachments.find(a => a.id === attId);
+  if (!att) return;
+
+  const key = idbKey(appState.currentSessionId, appState.currentLogId, attId);
+  try { await idbDel(key); } catch (e) { /* ignore */ }
+
+  log.attachments = log.attachments.filter(a => a.id !== attId);
+  log.updatedAt = new Date().toISOString();
+  sessions[sIdx].logs[lIdx] = log;
+  saveAllSessions(sessions);
+  refreshAttachmentsUI(log);
+  showToast('🗑️ 已删除 ' + att.name);
+}
+
+async function previewAttachment(attId) {
+  const result = getCurrentLog();
+  if (!result) return;
+  const att = (result.log.attachments || []).find(a => a.id === attId);
+  if (!att) return;
+
+  const key = idbKey(appState.currentSessionId, appState.currentLogId, attId);
+  let blob;
+  try { blob = await idbGet(key); } catch (e) { return; }
+  if (!blob) { showToast('⚠️ 文件数据无法读取'); return; }
+
+  const url = URL.createObjectURL(blob);
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lightboxImg');
+  const vid = document.getElementById('lightboxVid');
+  const nameEl = document.getElementById('lightboxName');
+
+  img.style.display = 'none';
+  vid.style.display = 'none';
+  if (vid.src) { vid.pause(); URL.revokeObjectURL(vid.src); vid.src = ''; }
+  if (img.src) { URL.revokeObjectURL(img.src); img.src = ''; }
+
+  if (IMG_TYPES.includes(att.type) || att.type === '') {
+    img.src = url;
+    img.style.display = '';
+  } else {
+    vid.src = url;
+    vid.style.display = '';
+  }
+  nameEl.textContent = att.name + '  (' + formatFileSize(att.size) + ')';
+  lb.classList.add('show');
+}
+
+function closeLightbox(event) {
+  // Only close if clicking background overlay or close button
+  if (event && event.target !== event.currentTarget) return;
+  const lb = document.getElementById('lightbox');
+  lb.classList.remove('show');
+  const img = document.getElementById('lightboxImg');
+  const vid = document.getElementById('lightboxVid');
+  if (vid.src) { vid.pause(); URL.revokeObjectURL(vid.src); vid.src = ''; }
+  if (img.src) { URL.revokeObjectURL(img.src); img.src = ''; }
+  img.style.display = 'none';
+  vid.style.display = 'none';
+}
+
+function renderAttachments(log) {
+  if (!log.attachments || !log.attachments.length) {
+    return '<div style="font-size:0.72rem;color:#555;padding:4px 0;">暂无附件</div>';
+  }
+  return log.attachments.map(att => {
+    const isImg = IMG_TYPES.includes(att.type) || att.type === '';
+    const thumb = isImg
+      ? '<img class="thumb-img" src="" data-attid="' + att.id + '" loading="lazy" style="display:none;">'
+      : '<div class="thumb-video">▶</div>';
+    return '' +
+      '<div class="attachment-card" onclick="previewAttachment(\'' + att.id + '\')" title="' +
+         att.name.replace(/"/g,'&quot;') + '">' +
+        '<button class="btn-del-att" onclick="deleteAttachment(\'' + att.id + '\',event)" title="删除">×</button>' +
+        thumb +
+        '<div class="file-info">' +
+          '<span class="file-name">' + att.name.replace(/"/g,'&quot;') + '</span>' +
+          '<span class="file-size">' + formatFileSize(att.size) + '</span>' +
+        '</div>' +
+      '</div>';
+  }).join('');
+}
+
+function refreshAttachmentsUI(log) {
+  const grid = document.getElementById('attachmentsGrid');
+  if (!grid) return;
+  grid.innerHTML = renderAttachments(log);
+  // Lazy-load image thumbnails
+  loadAttachmentThumbnails(log);
+}
+
+async function loadAttachmentThumbnails(log) {
+  if (!log.attachments) return;
+  const sid = appState.currentSessionId;
+  const lid = appState.currentLogId;
+  for (const att of log.attachments) {
+    if (!IMG_TYPES.includes(att.type) && att.type !== '') continue;
+    const img = document.querySelector('.thumb-img[data-attid="' + att.id + '"]');
+    if (!img || img.src) continue;
+    const key = idbKey(sid, lid, att.id);
+    try {
+      const blob = await idbGet(key);
+      if (blob && img) {
+        img.src = URL.createObjectURL(blob);
+        img.style.display = '';
+      }
+    } catch (e) { /* ignore */ }
+  }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 // ============================================================
