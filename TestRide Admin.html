@@ -166,6 +166,9 @@
   .param-grid .form-group { margin-bottom: 6px; }
   .param-grid .form-group input { padding: 6px 8px; font-size: 0.8rem; }
 
+  /* Overlay */
+  #fileOverlay.show { display: flex !important; }
+
   /* Responsive */
   @media (max-width: 900px) {
     .main { padding: 12px; }
@@ -186,11 +189,29 @@
     TEST RIDE <span style="color:var(--accent);">ADMIN</span>
     <span class="sub">数据分析后台</span>
   </div>
-  <div style="display:flex;gap:8px;">
-    <button class="btn btn-secondary btn-sm" onclick="clearAllData()">🗑 清空所有数据</button>
-    <button class="btn btn-secondary btn-sm" onclick="exportAllCSV()">📥 导出全部 CSV</button>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="fileStatus" style="font-size:0.7rem;">⚠️ 未打开文件</span>
+    <button class="btn btn-secondary btn-sm" onclick="doOpenFile()">📂 打开</button>
+    <button class="btn btn-secondary btn-sm" onclick="doSaveAs()">💾 另存为</button>
+    <button class="btn btn-secondary btn-sm" onclick="clearAllData()">🗑 清空</button>
   </div>
 </header>
+
+<!-- File selection overlay -->
+<div id="fileOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--accent);padding:40px 48px;text-align:center;max-width:460px;width:90%;">
+    <div style="font-size:2.5rem;margin-bottom:16px;">🏎️</div>
+    <div style="font-size:1.2rem;font-weight:700;margin-bottom:8px;">TestRide Admin</div>
+    <div style="font-size:0.78rem;color:var(--text2);margin-bottom:28px;">
+      数据存储在本地 JSON 文件中<br>容量不受限制，数据不会丢失
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="doCreateFile()" style="min-width:140px;">＋ 新建数据文件</button>
+      <button class="btn btn-secondary" onclick="doOpenFile()" style="min-width:140px;">📂 打开已有文件</button>
+    </div>
+    <div style="font-size:0.62rem;color:#555;margin-top:20px;">需要 Chrome / Edge 浏览器 · 数据文件可放在任意位置</div>
+  </div>
+</div>
 
 <!-- Nav -->
 <nav class="nav-tabs">
@@ -283,82 +304,86 @@
 
 <script>
 // ============================================================
-// Data Layer — IndexedDB
+// Data Layer — Local JSON file via File System Access API
 // ============================================================
-const DB_NAME = 'TestRideAdminDB';
-const DB_VER = 1;
-const STORE = 'sessions';
+const dataStore = { sessions: [], fileHandle: null, fileName: '' };
+const FILE_HANDLE_KEY = 'TestRideAdmin_fileHandle';
 
-function dbOpen() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'dbId' });
-    };
-    req.onsuccess = (e) => resolve(e.target.result);
-    req.onerror = (e) => reject(e.target.error);
-  });
+// Re-acquire permission for a previously saved file handle
+async function reacquireFileHandle() {
+  try {
+    const stored = localStorage.getItem(FILE_HANDLE_KEY);
+    if (!stored) return false;
+    // File System Access API doesn't persist handles in localStorage directly.
+    // We store a flag and let the user re-pick. This is more reliable.
+    return false;
+  } catch { return false; }
 }
 
-async function dbPut(session) {
-  const db = await dbOpen();
-  return new Promise((resolve, reject) => {
-    if (!session.dbId) session.dbId = session.sessionId + '_' + Date.now();
-    session.importedAt = session.importedAt || new Date().toISOString();
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(session);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
+async function openDataFile() {
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'JSON 数据文件', accept: { 'application/json': ['.json'] } }],
+      multiple: false
+    });
+    dataStore.fileHandle = handle;
+    dataStore.fileName = handle.name;
+    const file = await handle.getFile();
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    dataStore.sessions = (parsed.sessions || []).map(s => ({
+      ...s,
+      importedAt: s.importedAt || new Date().toISOString()
+    }));
+    return true;
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error(e);
+    return false;
+  }
 }
 
-async function dbGetAll() {
-  const db = await dbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).getAll();
-    req.onsuccess = () => { db.close(); resolve(req.result || []); };
-    req.onerror = () => { db.close(); reject(req.error); };
-  });
+async function createDataFile() {
+  try {
+    const handle = await window.showSaveFilePicker({
+      types: [{ description: 'JSON 数据文件', accept: { 'application/json': ['.json'] } }],
+      suggestedName: 'TestRide_Data.json'
+    });
+    dataStore.fileHandle = handle;
+    dataStore.fileName = handle.name;
+    dataStore.sessions = [];
+    await autoSave();
+    return true;
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error(e);
+    return false;
+  }
 }
 
-async function dbDelete(dbId) {
-  const db = await dbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(dbId);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
+async function autoSave() {
+  if (!dataStore.fileHandle) return;
+  try {
+    const writable = await dataStore.fileHandle.createWritable();
+    const json = JSON.stringify({ sessions: dataStore.sessions, updatedAt: new Date().toISOString() }, null, 2);
+    await writable.write(json);
+    await writable.close();
+  } catch (e) {
+    console.error('Save failed:', e);
+    showToast('⚠️ 保存失败，请检查文件权限');
+  }
 }
 
-async function dbClear() {
-  const db = await dbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).clear();
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
+function sessionById(sessionId) {
+  return dataStore.sessions.find(s => s.sessionId === sessionId);
 }
 
-async function dbUpdateSession(dbId, updateFn) {
-  const db = await dbOpen();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const store = tx.objectStore(STORE);
-    const req = store.get(dbId);
-    req.onsuccess = () => {
-      const session = req.result;
-      if (!session) { db.close(); reject(new Error('not found')); return; }
-      updateFn(session);
-      store.put(session);
-      tx.oncomplete = () => { db.close(); resolve(session); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    };
-    req.onerror = () => { db.close(); reject(req.error); };
-  });
+async function removeSession(sessionId) {
+  dataStore.sessions = dataStore.sessions.filter(s => s.sessionId !== sessionId);
+  await autoSave();
+}
+
+async function updateSession(sessionId, updateFn) {
+  const s = dataStore.sessions.find(s => s.sessionId === sessionId);
+  if (s) { updateFn(s); await autoSave(); }
 }
 
 // ============================================================
@@ -529,12 +554,13 @@ async function handleCSVFiles(fileList) {
       const rows = parseCSV(text);
       const sessions = csvToSessions(rows);
       for (const s of sessions) {
-        const existing = await dbGetAll();
-        const dup = existing.find(e => e.sessionId === s.sessionId);
+        s.importedAt = new Date().toISOString();
+        const dup = dataStore.sessions.find(e => e.sessionId === s.sessionId);
         if (dup) { skipped++; continue; }
-        await dbPut(s);
+        dataStore.sessions.push(s);
         imported++;
       }
+      if (imported) await autoSave();
     } catch (e) {
       console.error('CSV parse error:', file.name, e);
       skipped++;
@@ -568,7 +594,7 @@ document.getElementById('importZone').addEventListener('drop', (e) => {
 // Dashboard
 // ============================================================
 async function renderDashboard() {
-  const sessions = await dbGetAll();
+  const sessions = dataStore.sessions;
   const totalLogs = sessions.reduce((s, ses) => s + ses.logs.length, 0);
   const drivers = new Set();
   const testItems = new Set();
@@ -587,7 +613,7 @@ async function renderDashboard() {
   document.getElementById('recentSessions').innerHTML = recent.length
     ? '<table><thead><tr><th>会话 ID</th><th>日期</th><th>填写人</th><th>日志数</th><th>导入时间</th></tr></thead><tbody>' +
       recent.map(s => '' +
-        '<tr style="cursor:pointer;" onclick="switchView(\'browse\');setTimeout(()=>showSessionDetail(\'' + s.dbId + '\'),100)">' +
+        '<tr style="cursor:pointer;" onclick="switchView(\'browse\');setTimeout(()=>showSessionDetail(\'' + s.sessionId + '\'),100)">' +
         '<td>' + esc(s.sessionId) + '</td>' +
         '<td>' + esc(s.testTime) + '</td>' +
         '<td>' + esc(s.logger) + '</td>' +
@@ -601,7 +627,7 @@ async function renderDashboard() {
 // Import History
 // ============================================================
 async function renderImportHistory() {
-  const sessions = await dbGetAll();
+  const sessions = dataStore.sessions;
   const sorted = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || ''));
   document.getElementById('importHistory').innerHTML = sorted.length
     ? '<table><thead><tr><th>会话 ID</th><th>测试日期</th><th>填写人</th><th>日志数</th><th>导入时间</th><th>操作</th></tr></thead><tbody>' +
@@ -612,14 +638,14 @@ async function renderImportHistory() {
         '<td>' + esc(s.logger) + '</td>' +
         '<td>' + s.logs.length + '</td>' +
         '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
-        '<td><button class="btn btn-secondary btn-xs" onclick="deleteSession(\'' + s.dbId + '\')">删除</button></td>' +
+        '<td><button class="btn btn-secondary btn-xs" onclick="deleteSession(\'' + s.sessionId + '\')">删除</button></td>' +
         '</tr>').join('') + '</tbody></table>'
     : '<div style="color:var(--text2);padding:12px;">暂无导入记录</div>';
 }
 
-async function deleteSession(dbId) {
+async function deleteSession(sessionId) {
   if (!confirm('确定删除此会话？')) return;
-  await dbDelete(dbId);
+  await removeSession(sessionId);
   renderImportHistory();
   renderDashboard();
   showToast('已删除');
@@ -627,7 +653,7 @@ async function deleteSession(dbId) {
 
 async function clearAllData() {
   if (!confirm('确定清空所有导入数据？此操作不可撤销。')) return;
-  await dbClear();
+  dataStore.sessions = []; await autoSave();
   renderDashboard();
   renderImportHistory();
   renderBrowseList();
@@ -640,7 +666,7 @@ async function clearAllData() {
 let browseSearchTerm = '';
 async function renderBrowseList() {
   browseSearchTerm = (document.getElementById('browseSearch')?.value || '').toLowerCase();
-  const sessions = await dbGetAll();
+  const sessions = dataStore.sessions;
   const sorted = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || ''));
 
   const filtered = browseSearchTerm
@@ -656,22 +682,21 @@ async function renderBrowseList() {
         const drivers = [...new Set(s.logs.map(l => l.driver).filter(Boolean))];
         const items = [...new Set(s.logs.map(l => l.testItems).filter(Boolean))];
         return '' +
-          '<tr style="cursor:pointer;" onclick="showSessionDetail(\'' + s.dbId + '\')">' +
+          '<tr style="cursor:pointer;" onclick="showSessionDetail(\'' + s.sessionId + '\')">' +
           '<td>' + esc(s.testTime) + '</td>' +
           '<td>' + esc(s.logger) + '</td>' +
           '<td>' + s.logs.length + '</td>' +
           '<td>' + esc(drivers.join(', ')) + '</td>' +
           '<td>' + esc(items.join(', ')) + '</td>' +
           '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
-          '<td><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();deleteSession(\'' + s.dbId + '\')">删除</button></td>' +
+          '<td><button class="btn btn-secondary btn-xs" onclick="event.stopPropagation();deleteSession(\'' + s.sessionId + '\')">删除</button></td>' +
           '</tr>';
       }).join('')
     : '<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:24px;">暂无数据</td></tr>';
 }
 
-async function showSessionDetail(dbId) {
-  const sessions = await dbGetAll();
-  const s = sessions.find(x => x.dbId === dbId);
+async function showSessionDetail(sessionId) {
+  const s = sessionById(sessionId);
   if (!s) return;
 
   const st = s.setup || {};
@@ -705,7 +730,7 @@ async function showSessionDetail(dbId) {
             const best = l.lapTimes.length ? l.lapTimes.reduce((a, b) => (a && a < b) ? a : b, l.lapTimes[0]) : '-';
             return '' +
               '<div style="padding:8px 12px;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;" ' +
-                   'onclick="showLogDetail(\'' + dbId + '\',\'' + l.id + '\')">' +
+                   'onclick="showLogDetail(\'' + sessionId + '\',\'' + l.id + '\')">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                   '<strong>#' + (i + 1) + ' ' + esc(l.driver || '未命名') + '</strong>' +
                   '<span style="font-size:0.7rem;color:var(--text2);">' + esc(l.testItems || '') + '</span>' +
@@ -727,9 +752,8 @@ async function showSessionDetail(dbId) {
 // ============================================================
 // Log Detail — full view with vehicle params editor
 // ============================================================
-async function showLogDetail(dbId, logId) {
-  const sessions = await dbGetAll();
-  const s = sessions.find(x => x.dbId === dbId);
+async function showLogDetail(sessionId, logId) {
+  const s = sessionById(sessionId);
   if (!s) return;
   const log = s.logs.find(l => l.id === logId);
   if (!log) return;
@@ -820,7 +844,7 @@ async function showLogDetail(dbId, logId) {
           '<div>' +
             '<div class="sub-title">动力 Powertrain</div>' +
             '<div class="param-grid">' +
-              '<div class="form-group"><label>VCU 版本</label><input type="text" data-vp="vcuVersion" value="' + DEF('vcuVersion') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>VCU 版本</label><input type="text" data-vp="vcuVersion" value="' + DEF('vcuVersion') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
             '</div>' +
           '</div>' +
 
@@ -828,10 +852,10 @@ async function showLogDetail(dbId, logId) {
           '<div>' +
             '<div class="sub-title">轮胎 Tyre</div>' +
             '<div class="param-grid">' +
-              '<div class="form-group"><label>轮胎类型</label><input type="text" data-vp="tireType" value="' + DEF('tireType') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="干胎/雨胎"></div>' +
-              '<div class="form-group"><label>轮胎编号</label><input type="text" data-vp="tireNumber" value="' + DEF('tireNumber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="1-4"></div>' +
-              '<div class="form-group"><label>前胎压 psi</label><input type="text" data-vp="frontPressure" value="' + DEF('frontPressure') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>后胎压 psi</label><input type="text" data-vp="rearPressure" value="' + DEF('rearPressure') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>轮胎类型</label><input type="text" data-vp="tireType" value="' + DEF('tireType') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')" placeholder="干胎/雨胎"></div>' +
+              '<div class="form-group"><label>轮胎编号</label><input type="text" data-vp="tireNumber" value="' + DEF('tireNumber') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')" placeholder="1-4"></div>' +
+              '<div class="form-group"><label>前胎压 psi</label><input type="text" data-vp="frontPressure" value="' + DEF('frontPressure') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后胎压 psi</label><input type="text" data-vp="rearPressure" value="' + DEF('rearPressure') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
             '</div>' +
           '</div>' +
 
@@ -839,10 +863,10 @@ async function showLogDetail(dbId, logId) {
           '<div>' +
             '<div class="sub-title">定位角度 Alignment (°)</div>' +
             '<div class="param-grid">' +
-              '<div class="form-group"><label>前轮 Camber</label><input type="text" data-vp="frontCamber" value="' + DEF('frontCamber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>后轮 Camber</label><input type="text" data-vp="rearCamber" value="' + DEF('rearCamber') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>前轮 Toe</label><input type="text" data-vp="frontToe" value="' + DEF('frontToe') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>后轮 Toe</label><input type="text" data-vp="rearToe" value="' + DEF('rearToe') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>前轮 Camber</label><input type="text" data-vp="frontCamber" value="' + DEF('frontCamber') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后轮 Camber</label><input type="text" data-vp="rearCamber" value="' + DEF('rearCamber') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>前轮 Toe</label><input type="text" data-vp="frontToe" value="' + DEF('frontToe') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后轮 Toe</label><input type="text" data-vp="rearToe" value="' + DEF('rearToe') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
             '</div>' +
           '</div>' +
 
@@ -850,9 +874,9 @@ async function showLogDetail(dbId, logId) {
           '<div>' +
             '<div class="sub-title">悬架 Suspension</div>' +
             '<div class="param-grid">' +
-              '<div class="form-group"><label>前弹簧 N/mm</label><input type="text" data-vp="frontSpringRate" value="' + DEF('frontSpringRate') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>后弹簧 N/mm</label><input type="text" data-vp="rearSpringRate" value="' + DEF('rearSpringRate') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>' +
-              '<div class="form-group"><label>ARB 档位</label><input type="text" data-vp="arbSetting" value="' + DEF('arbSetting') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="1-6"></div>' +
+              '<div class="form-group"><label>前弹簧 N/mm</label><input type="text" data-vp="frontSpringRate" value="' + DEF('frontSpringRate') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>后弹簧 N/mm</label><input type="text" data-vp="rearSpringRate" value="' + DEF('rearSpringRate') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>' +
+              '<div class="form-group"><label>ARB 档位</label><input type="text" data-vp="arbSetting" value="' + DEF('arbSetting') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')" placeholder="1-6"></div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -862,13 +886,13 @@ async function showLogDetail(dbId, logId) {
           '<div>' +
             '<div class="sub-title">前悬阻尼 Front Damper</div>' +
             '<div class="param-grid">' +
-              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="frontDamper_' + df.key + '" value="' + damperVal(fdVp, fdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>').join('') +
+              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="frontDamper_' + df.key + '" value="' + damperVal(fdVp, fdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>').join('') +
             '</div>' +
           '</div>' +
           '<div>' +
             '<div class="sub-title">后悬阻尼 Rear Damper</div>' +
             '<div class="param-grid">' +
-              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="rearDamper_' + df.key + '" value="' + damperVal(rdVp, rdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')"></div>').join('') +
+              damperFields.map(df => '<div class="form-group"><label>' + df.label + '</label><input type="text" data-vp="rearDamper_' + df.key + '" value="' + damperVal(rdVp, rdSt, df.key).replace(/"/g,'&quot;') + '" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')"></div>').join('') +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -876,7 +900,7 @@ async function showLogDetail(dbId, logId) {
         // Notes
         '<div class="form-group" style="margin-top:12px;">' +
           '<label>车辆参数备注</label>' +
-          '<textarea data-vp="vpNotes" rows="2" onchange="saveVehicleParam(\'' + dbId + '\',\'' + logId + '\')" placeholder="额外的车辆设定说明...">' + (vp.vpNotes || '').replace(/"/g,'&quot;') + '</textarea>' +
+          '<textarea data-vp="vpNotes" rows="2" onchange="saveVehicleParam(\'' + sessionId + '\',\'' + logId + '\')" placeholder="额外的车辆设定说明...">' + (vp.vpNotes || '').replace(/"/g,'&quot;') + '</textarea>' +
         '</div>' +
 
         '<div style="margin-top:8px;font-size:0.62rem;color:var(--text2);">修改任意字段后自动保存 · 默认值为会话初始调校</div>' +
@@ -892,7 +916,7 @@ async function showLogDetail(dbId, logId) {
       '</div>' +
 
       '<div style="margin-top:12px;">' +
-        '<button class="btn btn-secondary btn-sm" onclick="showSessionDetail(\'' + dbId + '\')">← 返回会话详情</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="showSessionDetail(\'' + sessionId + '\')">← 返回会话详情</button>' +
       '</div>' +
     '</div>';
 
@@ -902,8 +926,8 @@ async function showLogDetail(dbId, logId) {
 // ============================================================
 // Vehicle Params — save per-log
 // ============================================================
-async function saveVehicleParam(dbId, logId) {
-  await dbUpdateSession(dbId, (session) => {
+async function saveVehicleParam(sessionId, logId) {
+  await updateSession(sessionId, (session) => {
     const log = session.logs.find(l => l.id === logId);
     if (!log) return;
     if (!log.vehicleParams) log.vehicleParams = {};
@@ -934,11 +958,11 @@ async function saveVehicleParam(dbId, logId) {
 let compareSelection = new Set();
 
 async function renderCompareSelector() {
-  const sessions = await dbGetAll();
+  const sessions = dataStore.sessions;
   let html = '';
   for (const s of sessions) {
     for (const log of s.logs) {
-      const key = s.dbId + '|' + log.id;
+      const key = s.sessionId + '|' + log.id;
       const checked = compareSelection.has(key) ? 'checked' : '';
       const best = (log.lapTimes || []).filter(Boolean).sort()[0] || '-';
       html += '' +
@@ -982,13 +1006,13 @@ function clearCompareSelection() {
 
 async function runComparison() {
   if (compareSelection.size < 2) { showToast('请至少选择 2 条日志进行对比'); return; }
-  const sessions = await dbGetAll();
+  const sessions = dataStore.sessions;
 
   // Collect selected logs
   const selected = [];
   for (const key of compareSelection) {
-    const [dbId, logId] = key.split('|');
-    const s = sessions.find(x => x.dbId === dbId);
+    const [sessionId, logId] = key.split('|');
+    const s = sessions.find(x => x.sessionId === sessionId);
     if (!s) continue;
     const log = s.logs.find(l => l.id === logId);
     if (!log) continue;
@@ -1104,9 +1128,66 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ============================================================
+// File management — open / create / status
+// ============================================================
+async function doOpenFile() {
+  const ok = await openDataFile();
+  if (ok) {
+    document.getElementById('fileOverlay').classList.remove('show');
+    updateFileStatus();
+    renderDashboard();
+    showToast('✅ 已加载 ' + dataStore.sessions.length + ' 个会话');
+  }
+}
+
+async function doCreateFile() {
+  const ok = await createDataFile();
+  if (ok) {
+    document.getElementById('fileOverlay').classList.remove('show');
+    updateFileStatus();
+    renderDashboard();
+    showToast('✅ 已创建新数据文件');
+  }
+}
+
+async function doSaveAs() {
+  try {
+    const handle = await window.showSaveFilePicker({
+      types: [{ description: 'JSON 数据文件', accept: { 'application/json': ['.json'] } }],
+      suggestedName: 'TestRide_Data.json'
+    });
+    dataStore.fileHandle = handle;
+    dataStore.fileName = handle.name;
+    await autoSave();
+    updateFileStatus();
+    showToast('✅ 已保存到 ' + handle.name);
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error(e);
+  }
+}
+
+function updateFileStatus() {
+  const el = document.getElementById('fileStatus');
+  if (!el) return;
+  if (dataStore.fileName) {
+    el.innerHTML = '📁 ' + esc(dataStore.fileName) + ' (' + dataStore.sessions.length + ' 会话)';
+    el.style.color = 'var(--green)';
+  } else {
+    el.innerHTML = '⚠️ 未打开文件';
+    el.style.color = 'var(--yellow)';
+  }
+}
+
+// ============================================================
 // Init
 // ============================================================
-renderDashboard();
+function init() {
+  // Show file selection overlay — user must pick or create a file
+  document.getElementById('fileOverlay').classList.add('show');
+  updateFileStatus();
+  renderDashboard();
+}
+init();
 </script>
 </body>
 </html>
