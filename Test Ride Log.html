@@ -915,7 +915,7 @@ function updateHeader() {
       <span style="color:var(--text2);font-size:0.85rem;display:flex;align-items:center;gap:6px;">
         📋 ${getSession(appState.currentSessionId)?.logger || ''}
       </span>
-      <button class="btn btn-primary" onclick="newTestSession()" title="导出当前测试并开始新测试">📦 新建测试</button>
+      <button class="btn btn-primary" onclick="newTestSession()" title="导出当前测试为 CSV 并开始新测试">📦 新建测试</button>
       <button class="btn btn-green" onclick="saveCurrentLog()">💾 保存</button>
       <button class="btn btn-blue" onclick="exportSessionJSON()">📋 导出 JSON</button>
       <button class="btn btn-blue" onclick="exportSessionCSV()">📊 导出 CSV</button>
@@ -1406,6 +1406,9 @@ function renderLogForm(log) {
 
   const v = (key) => (log[key] == null ? '' : String(log[key])).replace(/"/g, '&quot;');
   const laps = log.lapTimes || [];
+  const stParts = (log.startTime || '').split(':');
+  const startHour = stParts[0] || '';
+  const startMin = stParts[1] || '';
 
   let lapRowsHTML = '';
   laps.forEach((t, i) => {
@@ -1427,21 +1430,9 @@ function renderLogForm(log) {
       <div class="form-group">
         <label>开启时间 Start Time</label>
         <div style="display:flex;gap:8px;align-items:center;">
-          <select name="startHour" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
-            ${Array.from({length:24},(_,i)=>{
-              const hh = String(i).padStart(2,'0');
-              const sel = log.startTime && log.startTime.startsWith(hh+':') ? ' selected' : '';
-              return `<option value="${hh}"${sel}>${hh} 时</option>`;
-            }).join('')}
-          </select>
+          <input type="number" name="startHour" value="${startHour}" min="0" max="23" step="1" placeholder="时" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
           <span style="color:var(--text2);">:</span>
-          <select name="startMin" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
-            ${Array.from({length:12},(_,i)=>{
-              const mm = String(i*5).padStart(2,'0');
-              const sel = log.startTime && log.startTime.endsWith(':'+mm) ? ' selected' : '';
-              return `<option value="${mm}"${sel}>${mm} 分</option>`;
-            }).join('')}
-          </select>
+          <input type="number" name="startMin" value="${startMin}" min="0" max="59" step="1" placeholder="分" style="background:#111;color:#fff;border:1px solid #333;padding:10px 12px;font-size:0.95rem;font-family:var(--font);width:100%;">
         </div>
         <input type="hidden" name="startTime" value="${v('startTime')}">
       </div>
@@ -1606,19 +1597,25 @@ function renderLogForm(log) {
 }
 
 // ============================================================
-// Start Time: hour + min selects → hidden input
+// Start Time: hour + min number inputs → hidden input
 // ============================================================
 function syncStartTime() {
   const h = document.querySelector('[name="startHour"]');
   const m = document.querySelector('[name="startMin"]');
   const hidden = document.querySelector('[name="startTime"]');
   if (!h || !m || !hidden) return;
-  const newTime = h.value + ':' + m.value;
+
+  const hv = String(h.value || '').trim();
+  const mv = String(m.value || '').trim();
+  let newTime = '';
+  if (hv !== '' || mv !== '') {
+    newTime = (hv !== '' ? hv.padStart(2, '0') : '00') + ':' + (mv !== '' ? mv.padStart(2, '0') : '00');
+  }
   hidden.value = newTime;
 
   // Update current log's option text in the dropdown
   const sel = document.getElementById('logSelector');
-  if (sel && appState.currentLogId) {
+  if (sel && appState.currentLogId && newTime) {
     const opt = sel.querySelector(`option[value="${appState.currentLogId}"]`);
     if (opt) {
       const parts = opt.textContent.split(' — ');
@@ -2054,13 +2051,13 @@ function addNewLog() {
 // ============================================================
 function newTestSession() {
   autoSave();
-  // Export current session
+  // Export current session as CSV
   const session = getSession(appState.currentSessionId);
   if (session) {
-    exportSessionJSON_internal(session);
+    exportSessionCSV_internal(session);
   }
   renderStartPage();
-  showToast('📦 当前测试已导出，开始新测试');
+  showToast('📦 当前测试已导出 CSV，开始新测试');
 }
 
 // ============================================================
@@ -2077,6 +2074,9 @@ function autoSave() {
   const log = sessions[sIdx].logs[lIdx];
   const form = document.getElementById('logForm');
   if (!form) return;
+
+  // Keep hidden startTime in sync with the hour/minute inputs before reading fields
+  syncStartTime();
 
   const simpleFields = [
     'testItems','testItemsCustom','driver','airTemp','surfaceTemp','surfaceCondition',
@@ -2180,8 +2180,11 @@ function exportSessionJSON_internal(session) {
 function exportSessionCSV() {
   const data = getExportData();
   if (data.length === 0) { showToast('⚠️ 没有可导出的数据'); return; }
-  const session = data[0];
+  exportSessionCSV_internal(data[0]);
+  showToast('📊 CSV 导出成功');
+}
 
+function exportSessionCSV_internal(session) {
   const st = session.setup || getEmptySetup();
   function sv(k) { const v = st[k]; return (v == null ? '' : String(v)); }
   function tdv(corner, pt) {
@@ -2252,7 +2255,6 @@ function exportSessionCSV() {
   const csv = BOM + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, `TestRide_${session.sessionId}.csv`);
-  showToast('📊 CSV 导出成功');
 }
 
 function downloadBlob(blob, filename) {
