@@ -178,7 +178,43 @@
     .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
     .param-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   }
+  /* Chart containers */
+  .chart-row { display: grid; gap: 16px; margin-bottom: 16px; }
+  .chart-wrap { position: relative; width: 100%; min-height: 280px; }
+  .chart-wrap canvas { width: 100% !important; }
+
+  /* Filter chips */
+  .chip-select { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-block; padding: 4px 10px; border: 1px solid var(--border2); font-size: 0.72rem; cursor: pointer; transition: all 0.15s; color: var(--text2); user-select: none; }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filter-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--surface2); border: 1px solid var(--border2); font-size: 0.68rem; color: var(--text); }
+  .filter-chip .remove { cursor: pointer; color: var(--accent); font-weight: 700; font-size: 0.8rem; line-height: 1; }
+  .filter-chip .remove:hover { color: var(--accent-hover); }
+
+  /* Print */
+  @media print {
+    body { background: #fff; color: #000; }
+    body::before { display: none; }
+    .header, .nav-tabs, #fileOverlay, .toast, button, input, .btn,
+    #importZone, #csvFileInput, .import-zone { display: none !important; }
+    .card { background: #fff; border: 1px solid #ccc; break-inside: avoid; }
+    .card::after { display: none; }
+    .card-title { color: #000; border-bottom-color: #ccc; }
+    table { font-size: 0.7rem; color: #000; }
+    th { background: #eee; color: #000; }
+    td, th { border-bottom: 1px solid #ccc; }
+    .stats-grid { break-inside: avoid; }
+    .stat-card { background: #f5f5f5; border: 1px solid #ddd; }
+    .stat-card .stat-value { color: #000; }
+    .view { display: block !important; }
+    .chart-wrap { break-inside: avoid; max-height: 400px; }
+    .compare-table td.diff-better { background: #d4f5d4 !important; color: #000 !important; }
+    .compare-table td.diff-worse { background: #f5d4d4 !important; color: #000 !important; }
+    @page { margin: 1cm; }
+  }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -227,6 +263,21 @@
   <!-- ======== Dashboard ======== -->
   <div class="view active" id="view-dashboard">
     <div class="stats-grid" id="dashboardStats"></div>
+
+    <!-- Export buttons -->
+    <div style="margin-bottom:12px;display:flex;gap:8px;">
+      <button class="btn btn-secondary btn-sm" onclick="exportDashboardMD()">📝 导出统计报告</button>
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ 打印概览</button>
+    </div>
+
+    <!-- Test type distribution (clickable) -->
+    <div class="chart-row">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>测试项目分布 <span style="font-size:0.62rem;color:var(--text2);font-weight:400;">点击扇区跳转到对比</span></div>
+        <div class="chart-wrap" style="max-height:340px;"><canvas id="chartTestType"></canvas></div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title"><span class="dot"></span>最近导入</div>
       <div id="recentSessions"></div>
@@ -255,9 +306,46 @@
   <div class="view" id="view-browse">
     <div class="card">
       <div class="card-title"><span class="dot"></span>会话列表 <span style="font-size:0.65rem;color:var(--text2);font-weight:400;">点击行展开详情</span></div>
-      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <input type="text" id="browseSearch" placeholder="搜索车手/测试项目/日期..." style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);" oninput="renderBrowseList()">
+
+      <!-- Search + Filter toggle -->
+      <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="browseSearch" placeholder="搜索车手/测试项目/日期..." style="flex:1;min-width:200px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font);" oninput="onBrowseSearchChange()">
+        <button class="btn btn-secondary btn-sm" onclick="toggleFilterPanel()" id="btnToggleFilter">🔍 筛选 <span id="filterCountBadge" style="display:none;background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;font-size:0.6rem;margin-left:4px;">0</span></button>
       </div>
+
+      <!-- Filter panel (collapsible) -->
+      <div id="filterPanel" style="display:none;background:var(--surface2);border:1px solid var(--border);padding:12px 16px;margin-bottom:10px;">
+        <!-- Quick presets -->
+        <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:0.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;">快速筛选:</span>
+          <button class="btn btn-secondary btn-xs" onclick="applyFilterPreset('7days')">最近7天</button>
+          <button class="btn btn-secondary btn-xs" onclick="applyFilterPreset('30days')">最近30天</button>
+          <button class="btn btn-secondary btn-xs" onclick="applyFilterPreset('hasLaps')">有圈速数据</button>
+          <button class="btn btn-secondary btn-xs" onclick="clearAllFilters()">清除全部</button>
+        </div>
+
+        <!-- Date range -->
+        <div class="form-row cols-2" style="margin-bottom:10px;">
+          <div class="form-group"><label>日期范围 从</label><input type="date" id="filterDateFrom" onchange="onFilterChange()"></div>
+          <div class="form-group"><label>日期范围 至</label><input type="date" id="filterDateTo" onchange="onFilterChange()"></div>
+        </div>
+
+        <!-- Lap time range -->
+        <div class="form-row cols-2" style="margin-bottom:10px;">
+          <div class="form-group"><label>圈速 慢于 (秒)</label><input type="text" id="filterLapMin" placeholder="例: 60.0" onchange="onFilterChange()"></div>
+          <div class="form-group"><label>圈速 快于 (秒)</label><input type="text" id="filterLapMax" placeholder="例: 55.0" onchange="onFilterChange()"></div>
+        </div>
+
+        <!-- Driver multi-select -->
+        <div class="form-group"><label>车手 (多选)</label><div id="filterDrivers" class="chip-select"></div></div>
+
+        <!-- Test item multi-select -->
+        <div class="form-group"><label>测试项目 (多选)</label><div id="filterTestItems" class="chip-select"></div></div>
+      </div>
+
+      <!-- Active filter chips -->
+      <div id="activeFilterChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;"></div>
+
       <div class="table-wrap">
         <table>
           <thead><tr>
@@ -273,6 +361,13 @@
 
   <!-- ======== Compare ======== -->
   <div class="view" id="view-compare">
+    <div id="compareFilterBanner" style="display:none;align-items:center;justify-content:space-between;gap:8px;padding:8px 14px;margin-bottom:12px;background:rgba(34,197,94,0.08);border:1px solid var(--green);color:var(--green);font-size:0.78rem;"></div>
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>圈速折线 · 按车手分组 <span style="font-size:0.62rem;color:var(--text2);font-weight:400;">点击圈速点选择日志（可多选）</span></div>
+      <div class="chart-wrap" style="min-height:340px;"><canvas id="chartCompareSelect"></canvas></div>
+      <div id="compareChartEmpty" style="display:none;padding:24px;color:var(--text2);text-align:center;">暂无圈速数据，请先导入包含圈速的日志</div>
+    </div>
+
     <div class="card">
       <div class="card-title"><span class="dot"></span>多日志对比</div>
       <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
@@ -289,8 +384,9 @@
           <tbody id="compareSelector"></tbody>
         </table>
       </div>
-      <div style="margin-top:12px;">
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="runComparison()">🔍 开始对比</button>
+        <button class="btn btn-secondary" onclick="clearComparison()">🗑 清除对比</button>
       </div>
     </div>
     <div id="compareResult"></div>
@@ -535,7 +631,7 @@ function switchView(view) {
   if (view === 'dashboard') renderDashboard();
   if (view === 'import') renderImportHistory();
   if (view === 'browse') renderBrowseList();
-  if (view === 'compare') renderCompareSelector();
+  if (view === 'compare') { renderCompareSelector(); renderCompareSelectChart(); renderCompareFilterBanner(); }
 }
 
 // ============================================================
@@ -621,6 +717,8 @@ async function renderDashboard() {
         '<td>' + esc(fmtDate(s.importedAt)) + '</td>' +
         '</tr>').join('') + '</tbody></table>'
     : '<div style="color:var(--text2);padding:12px;">暂无数据，请先导入 CSV</div>';
+
+  renderDashboardCharts();
 }
 
 // ============================================================
@@ -663,19 +761,177 @@ async function clearAllData() {
 // ============================================================
 // Browse
 // ============================================================
-let browseSearchTerm = '';
+const browseFilters = {
+  search: '',
+  dateFrom: '',
+  dateTo: '',
+  drivers: new Set(),
+  testItems: new Set(),
+  lapTimeMin: '',
+  lapTimeMax: '',
+  hasLapData: false
+};
+
+function onBrowseSearchChange() {
+  browseFilters.search = (document.getElementById('browseSearch')?.value || '').toLowerCase();
+  renderBrowseList();
+}
+
+function toggleFilterPanel() {
+  const panel = document.getElementById('filterPanel');
+  const show = panel.style.display === 'none';
+  panel.style.display = show ? 'block' : 'none';
+  if (show) populateFilterOptions();
+}
+
+function populateFilterOptions() {
+  const allDrivers = new Set();
+  const allItems = new Set();
+  dataStore.sessions.forEach(s => s.logs.forEach(l => {
+    if (l.driver) allDrivers.add(l.driver);
+    if (l.testItems) allItems.add(l.testItems);
+  }));
+
+  document.getElementById('filterDrivers').innerHTML =
+    [...allDrivers].sort().map(d =>
+      '<span class="chip' + (browseFilters.drivers.has(d) ? ' selected' : '') + '" onclick="toggleDriverFilter(\'' + esc(d).replace(/'/g,"\\'") + '\')">' + esc(d) + '</span>'
+    ).join('') || '<span style="color:var(--text2);font-size:0.7rem;">无数据</span>';
+
+  document.getElementById('filterTestItems').innerHTML =
+    [...allItems].sort().map(t =>
+      '<span class="chip' + (browseFilters.testItems.has(t) ? ' selected' : '') + '" onclick="toggleTestItemFilter(\'' + esc(t).replace(/'/g,"\\'") + '\')">' + esc(t) + '</span>'
+    ).join('') || '<span style="color:var(--text2);font-size:0.7rem;">无数据</span>';
+}
+
+function toggleDriverFilter(driver) {
+  if (browseFilters.drivers.has(driver)) browseFilters.drivers.delete(driver);
+  else browseFilters.drivers.add(driver);
+  populateFilterOptions();
+  onFilterChange();
+}
+
+function toggleTestItemFilter(item) {
+  if (browseFilters.testItems.has(item)) browseFilters.testItems.delete(item);
+  else browseFilters.testItems.add(item);
+  populateFilterOptions();
+  onFilterChange();
+}
+
+function onFilterChange() {
+  browseFilters.dateFrom = document.getElementById('filterDateFrom')?.value || '';
+  browseFilters.dateTo = document.getElementById('filterDateTo')?.value || '';
+  browseFilters.lapTimeMin = document.getElementById('filterLapMin')?.value || '';
+  browseFilters.lapTimeMax = document.getElementById('filterLapMax')?.value || '';
+  syncFilterChips();
+  updateFilterBadge();
+  renderBrowseList();
+}
+
+function syncFilterChips() {
+  // Build chip array with clear callbacks
+  window._filterChipData = [];
+  if (browseFilters.dateFrom) window._filterChipData.push({ label: '从 ' + browseFilters.dateFrom, clear: () => { browseFilters.dateFrom = ''; document.getElementById('filterDateFrom').value = ''; onFilterChange(); } });
+  if (browseFilters.dateTo) window._filterChipData.push({ label: '至 ' + browseFilters.dateTo, clear: () => { browseFilters.dateTo = ''; document.getElementById('filterDateTo').value = ''; onFilterChange(); } });
+  if (browseFilters.lapTimeMin) window._filterChipData.push({ label: '圈速 ≥ ' + browseFilters.lapTimeMin + 's', clear: () => { browseFilters.lapTimeMin = ''; document.getElementById('filterLapMin').value = ''; onFilterChange(); } });
+  if (browseFilters.lapTimeMax) window._filterChipData.push({ label: '圈速 ≤ ' + browseFilters.lapTimeMax + 's', clear: () => { browseFilters.lapTimeMax = ''; document.getElementById('filterLapMax').value = ''; onFilterChange(); } });
+  browseFilters.drivers.forEach(d => window._filterChipData.push({ label: '车手: ' + d, clear: () => { browseFilters.drivers.delete(d); onFilterChange(); } }));
+  browseFilters.testItems.forEach(t => window._filterChipData.push({ label: '项目: ' + t, clear: () => { browseFilters.testItems.delete(t); onFilterChange(); } }));
+  if (browseFilters.hasLapData) window._filterChipData.push({ label: '有圈速数据', clear: () => { browseFilters.hasLapData = false; onFilterChange(); } });
+
+  document.getElementById('activeFilterChips').innerHTML = window._filterChipData.map((c, i) =>
+    '<span class="filter-chip">' + esc(c.label) + '<span class="remove" onclick="window._filterChipData[' + i + '].clear()">✕</span></span>'
+  ).join('');
+}
+
+function updateFilterBadge() {
+  let count = 0;
+  if (browseFilters.dateFrom) count++;
+  if (browseFilters.dateTo) count++;
+  if (browseFilters.lapTimeMin) count++;
+  if (browseFilters.lapTimeMax) count++;
+  count += browseFilters.drivers.size + browseFilters.testItems.size;
+  if (browseFilters.hasLapData) count++;
+  const badge = document.getElementById('filterCountBadge');
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'inline' : 'none';
+}
+
+function applyFilterPreset(preset) {
+  if (preset === '7days') {
+    const d = new Date(); d.setDate(d.getDate() - 7);
+    browseFilters.dateFrom = d.toISOString().split('T')[0];
+    browseFilters.dateTo = new Date().toISOString().split('T')[0];
+    document.getElementById('filterDateFrom').value = browseFilters.dateFrom;
+    document.getElementById('filterDateTo').value = browseFilters.dateTo;
+  } else if (preset === '30days') {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    browseFilters.dateFrom = d.toISOString().split('T')[0];
+    browseFilters.dateTo = new Date().toISOString().split('T')[0];
+    document.getElementById('filterDateFrom').value = browseFilters.dateFrom;
+    document.getElementById('filterDateTo').value = browseFilters.dateTo;
+  } else if (preset === 'hasLaps') {
+    browseFilters.hasLapData = true;
+  }
+  document.getElementById('filterPanel').style.display = 'block';
+  populateFilterOptions();
+  onFilterChange();
+}
+
+function clearAllFilters() {
+  browseFilters.dateFrom = '';
+  browseFilters.dateTo = '';
+  browseFilters.lapTimeMin = '';
+  browseFilters.lapTimeMax = '';
+  browseFilters.drivers.clear();
+  browseFilters.testItems.clear();
+  browseFilters.hasLapData = false;
+  document.getElementById('filterDateFrom').value = '';
+  document.getElementById('filterDateTo').value = '';
+  document.getElementById('filterLapMin').value = '';
+  document.getElementById('filterLapMax').value = '';
+  populateFilterOptions();
+  onFilterChange();
+}
+
 async function renderBrowseList() {
-  browseSearchTerm = (document.getElementById('browseSearch')?.value || '').toLowerCase();
+  browseFilters.search = (document.getElementById('browseSearch')?.value || '').toLowerCase();
   const sessions = dataStore.sessions;
   const sorted = sessions.sort((a, b) => (b.importedAt || '').localeCompare(a.importedAt || ''));
 
-  const filtered = browseSearchTerm
-    ? sorted.filter(s =>
-        s.sessionId.toLowerCase().includes(browseSearchTerm) ||
-        s.logger.toLowerCase().includes(browseSearchTerm) ||
-        s.testTime.toLowerCase().includes(browseSearchTerm) ||
-        s.logs.some(l => l.driver.toLowerCase().includes(browseSearchTerm) || l.testItems.toLowerCase().includes(browseSearchTerm)))
-    : sorted;
+  const filtered = sorted.filter(s => {
+    // Text search
+    if (browseFilters.search) {
+      const matchText =
+        s.sessionId.toLowerCase().includes(browseFilters.search) ||
+        s.logger.toLowerCase().includes(browseFilters.search) ||
+        s.testTime.toLowerCase().includes(browseFilters.search) ||
+        s.logs.some(l => l.driver.toLowerCase().includes(browseFilters.search) ||
+                        l.testItems.toLowerCase().includes(browseFilters.search));
+      if (!matchText) return false;
+    }
+    // Date range (compare date part only to handle time components)
+    const testDate = (s.testTime || '').slice(0, 10);
+    if (browseFilters.dateFrom && testDate < browseFilters.dateFrom) return false;
+    if (browseFilters.dateTo && testDate > browseFilters.dateTo) return false;
+    // Driver
+    if (browseFilters.drivers.size > 0 && !s.logs.some(l => browseFilters.drivers.has(l.driver))) return false;
+    // Test item
+    if (browseFilters.testItems.size > 0 && !s.logs.some(l => browseFilters.testItems.has(l.testItems))) return false;
+    // Lap time range
+    if (browseFilters.lapTimeMin || browseFilters.lapTimeMax) {
+      const hasMatch = s.logs.some(l => {
+        const best = (l.lapTimes || []).map(Number).filter(v => !isNaN(v)).sort((a,b) => a - b)[0];
+        if (best == null) return false;
+        if (browseFilters.lapTimeMin && best < parseFloat(browseFilters.lapTimeMin)) return false;
+        if (browseFilters.lapTimeMax && best > parseFloat(browseFilters.lapTimeMax)) return false;
+        return true;
+      });
+      if (!hasMatch) return false;
+    }
+    // Has lap data
+    if (browseFilters.hasLapData && !s.logs.some(l => l.lapTimes && l.lapTimes.length > 0)) return false;
+    return true;
+  });
 
   document.getElementById('browseTable').innerHTML = filtered.length
     ? filtered.map(s => {
@@ -693,6 +949,60 @@ async function renderBrowseList() {
           '</tr>';
       }).join('')
     : '<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:24px;">暂无数据</td></tr>';
+}
+
+// Compute tuning diff between log's vehicleParams and session initial setup
+function getTuningDiff(session, log) {
+  const st = session.setup || {};
+  const vp = log.vehicleParams || {};
+  const changes = [];
+
+  const simpleFields = [
+    { key: 'vcuVersion', label: 'VCU' },
+    { key: 'tireType', label: '轮胎' },
+    { key: 'tireNumber', label: '胎号' },
+    { key: 'frontCamber', label: '前Camb' },
+    { key: 'rearCamber', label: '后Camb' },
+    { key: 'frontToe', label: '前Toe' },
+    { key: 'rearToe', label: '后Toe' },
+    { key: 'frontPressure', label: '前胎压' },
+    { key: 'rearPressure', label: '后胎压' },
+    { key: 'frontSpringRate', label: '前弹簧' },
+    { key: 'rearSpringRate', label: '后弹簧' },
+    { key: 'arbSetting', label: 'ARB' }
+  ];
+
+  for (const { key, label } of simpleFields) {
+    const vpVal = (vp[key] != null && vp[key] !== '') ? String(vp[key]) : null;
+    const stVal = (st[key] != null && st[key] !== '') ? String(st[key]) : null;
+    if (vpVal !== null && vpVal !== stVal) {
+      changes.push(label + ' ' + (stVal || '?') + '→' + vpVal);
+    }
+  }
+
+  const damperKeys = { hsComp: 'HSC', hsReb: 'HSR', lsComp: 'LSC', lsReb: 'LSR' };
+  const fdvp = vp.frontDamper || {};
+  const rdvp = vp.rearDamper || {};
+  const fdst = st.frontDamper || {};
+  const rdst = st.rearDamper || {};
+
+  for (const [key, label] of Object.entries(damperKeys)) {
+    const vpVal = (fdvp[key] != null && fdvp[key] !== '') ? String(fdvp[key]) : null;
+    const stVal = (fdst[key] != null && fdst[key] !== '') ? String(fdst[key]) : null;
+    if (vpVal !== null && vpVal !== stVal) {
+      changes.push('前' + label + ' ' + (stVal || '?') + '→' + vpVal);
+    }
+  }
+  for (const [key, label] of Object.entries(damperKeys)) {
+    const vpVal = (rdvp[key] != null && rdvp[key] !== '') ? String(rdvp[key]) : null;
+    const stVal = (rdst[key] != null && rdst[key] !== '') ? String(rdst[key]) : null;
+    if (vpVal !== null && vpVal !== stVal) {
+      changes.push('后' + label + ' ' + (stVal || '?') + '→' + vpVal);
+    }
+  }
+
+  if (changes.length > 0) return changes.join('; ');
+  return (vp.vpNotes && vp.vpNotes.trim()) ? vp.vpNotes.trim() : '无';
 }
 
 async function showSessionDetail(sessionId) {
@@ -728,17 +1038,16 @@ async function showSessionDetail(sessionId) {
           '<div style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:8px;">日志列表 (' + s.logs.length + ' 条)</div>' +
           s.logs.map((l, i) => {
             const best = l.lapTimes.length ? l.lapTimes.reduce((a, b) => (a && a < b) ? a : b, l.lapTimes[0]) : '-';
+            const diff = getTuningDiff(s, l);
+            const changed = !!(l.vehicleParams) && diff !== '无';
             return '' +
               '<div style="padding:8px 12px;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;" ' +
                    'onclick="showLogDetail(\'' + sessionId + '\',\'' + l.id + '\')">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                  '<strong>#' + (i + 1) + ' ' + esc(l.driver || '未命名') + '</strong>' +
-                  '<span style="font-size:0.7rem;color:var(--text2);">' + esc(l.testItems || '') + '</span>' +
+                '<strong>' + esc(l.startTime || ('#' + (i + 1))) + '</strong>' +
+                (changed ? '<span style="font-size:0.6rem;color:var(--green);border:1px solid var(--green);padding:1px 6px;border-radius:8px;margin-left:8px;">已更改车辆参数</span>' : '') +
+                '<div style="font-size:0.68rem;color:var(--text2);margin-top:3px;">' +
+                  '车手: ' + esc(l.driver || '-') + ' | 测试项目: ' + esc(l.testItems || '-') + ' | 最佳: ' + esc(best) + ' | 调校: ' + esc(diff) +
                 '</div>' +
-                '<div style="font-size:0.68rem;color:var(--text2);margin-top:4px;">' +
-                  '最佳圈速: ' + esc(best) + ' | 胎温前: ' + esc(l.pre_flTempMid || '-') + '°C | 气压: ' + esc(l.pre_flPressure || '-') + 'psi' +
-                '</div>' +
-                (l.vehicleParams ? '<div style="font-size:0.62rem;color:var(--green);margin-top:2px;">已设定车辆参数</div>' : '') +
               '</div>';
           }).join('') +
         '</div>' +
@@ -956,18 +1265,47 @@ async function saveVehicleParam(sessionId, logId) {
 // Compare
 // ============================================================
 let compareSelection = new Set();
+let _comparePoints = [];
+let _compareDriverColors = {};
+let _compareTestItemFilter = null;
+
+function compareLogMatchesFilter(log) {
+  if (!_compareTestItemFilter) return true;
+  return (log.testItems || '(未分类)') === _compareTestItemFilter;
+}
+
+function renderCompareFilterBanner() {
+  const el = document.getElementById('compareFilterBanner');
+  if (!el) return;
+  if (_compareTestItemFilter) {
+    el.style.display = 'flex';
+    el.innerHTML = '<span>🔍 当前仅显示项目：<strong>' + esc(_compareTestItemFilter) + '</strong></span>' +
+      '<button class="btn btn-secondary btn-xs" onclick="clearCompareTestItemFilter()">✕ 显示全部项目</button>';
+  } else {
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+}
+
+function clearCompareTestItemFilter() {
+  _compareTestItemFilter = null;
+  renderCompareSelector();
+  renderCompareSelectChart();
+  renderCompareFilterBanner();
+}
 
 async function renderCompareSelector() {
   const sessions = dataStore.sessions;
   let html = '';
   for (const s of sessions) {
     for (const log of s.logs) {
+      if (!compareLogMatchesFilter(log)) continue;
       const key = s.sessionId + '|' + log.id;
       const checked = compareSelection.has(key) ? 'checked' : '';
       const best = (log.lapTimes || []).filter(Boolean).sort()[0] || '-';
       html += '' +
         '<tr>' +
-        '<td><input type="checkbox" ' + checked + ' onchange="toggleCompareSelection(\'' + key + '\',this.checked)"></td>' +
+        '<td><input type="checkbox" data-key="' + key + '" ' + checked + ' onchange="toggleCompareSelection(\'' + key + '\',this.checked)"></td>' +
         '<td>' + esc(s.testTime) + '</td>' +
         '<td>' + esc(log.driver || log.id) + '</td>' +
         '<td>' + esc(log.driver) + '</td>' +
@@ -983,7 +1321,11 @@ async function renderCompareSelector() {
 
 function toggleCompareSelection(key, checked) {
   if (checked) compareSelection.add(key); else compareSelection.delete(key);
+  document.querySelectorAll('#compareSelector input[type="checkbox"]').forEach(cb => {
+    if (cb.getAttribute('data-key') === key) cb.checked = checked;
+  });
   updateCompareCount();
+  updateCompareChartSelection();
 }
 
 function updateCompareCount() {
@@ -993,15 +1335,165 @@ function updateCompareCount() {
 function selectAllLogsForCompare() {
   document.querySelectorAll('#compareSelector input[type="checkbox"]').forEach(cb => {
     cb.checked = true;
-    compareSelection.add(cb.getAttribute('onchange').match(/'(.*?)'/)[1]);
+    compareSelection.add(cb.getAttribute('data-key'));
   });
   updateCompareCount();
+  updateCompareChartSelection();
 }
 
 function clearCompareSelection() {
   compareSelection.clear();
   document.querySelectorAll('#compareSelector input[type="checkbox"]').forEach(cb => cb.checked = false);
   updateCompareCount();
+  updateCompareChartSelection();
+}
+
+function clearComparison() {
+  document.getElementById('compareResult').innerHTML = '';
+  showToast('已清除对比结果');
+}
+
+// ============================================================
+// Compare — interactive lap-time selection chart (grouped by driver)
+// ============================================================
+function shortTimeLabel(s) {
+  if (!s) return '';
+  const m = String(s).match(/(\d{1,2}):(\d{2})/);
+  return m ? m[1] + ':' + m[2] : '';
+}
+
+function renderCompareSelectChart() {
+  setTimeout(() => {
+    initChartDefaults();
+    if (window._compareSelectChart) { try { window._compareSelectChart.destroy(); } catch (e) {} window._compareSelectChart = null; }
+
+    const canvas = document.getElementById('chartCompareSelect');
+    if (!canvas) return;
+    const emptyEl = document.getElementById('compareChartEmpty');
+
+    // Time-sorted logs (optionally filtered to a single test item)
+    const entries = [];
+    dataStore.sessions.forEach(s => s.logs.forEach(l => {
+      if (!compareLogMatchesFilter(l)) return;
+      entries.push({ session: s, log: l });
+    }));
+    entries.sort((a, b) => (a.log.startTime || a.session.testTime || '').localeCompare(b.log.startTime || b.session.testTime || ''));
+
+    // One point per lap, in time order
+    const points = [];
+    const labels = [];
+    const showTick = [];
+    const driverOrder = [];
+    const driverSet = new Set();
+    _compareDriverColors = {};
+    const palette = [chartTheme.accent, chartTheme.green, chartTheme.yellow, chartTheme.blue, chartTheme.purple];
+
+    entries.forEach(e => {
+      const key = e.session.sessionId + '|' + e.log.id;
+      const driver = e.log.driver || '(未标注)';
+      const times = (e.log.lapTimes || []).map(Number).filter(v => !isNaN(v));
+      if (!driverSet.has(driver)) { driverSet.add(driver); driverOrder.push(driver); _compareDriverColors[driver] = palette[(driverOrder.length - 1) % palette.length]; }
+      const tLabel = shortTimeLabel(e.log.startTime);
+      times.forEach((v, li) => {
+        points.push({ key: key, driver: driver, value: v, lap: li + 1, startTime: e.log.startTime || e.session.testTime || '' });
+        labels.push(driver + (li === 0 && tLabel ? ' · ' + tLabel : ''));
+        showTick.push(li === 0);
+      });
+    });
+    _comparePoints = points;
+
+    if (!points.length) {
+      canvas.style.display = 'none';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    canvas.style.display = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const datasets = driverOrder.map(driver => {
+      const color = _compareDriverColors[driver];
+      const isSelected = (p) => !!(p && compareSelection.has(p.key));
+      return {
+        label: driver,
+        data: points.map(p => p.driver === driver ? p.value : null),
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 1.5,
+        tension: 0.15,
+        spanGaps: false,
+        pointRadius: (ctx) => {
+          const p = points[ctx.dataIndex];
+          return (p && p.driver === driver) ? (isSelected(p) ? 7 : 3) : 0;
+        },
+        pointHoverRadius: 6,
+        pointBackgroundColor: (ctx) => {
+          const p = points[ctx.dataIndex];
+          return isSelected(p) ? '#ffffff' : color;
+        },
+        pointBorderColor: (ctx) => {
+          const p = points[ctx.dataIndex];
+          return isSelected(p) ? chartTheme.accent : color;
+        },
+        pointBorderWidth: (ctx) => {
+          const p = points[ctx.dataIndex];
+          return isSelected(p) ? 2 : 1.5;
+        }
+      };
+    });
+
+    window._compareSelectChart = new Chart(canvas, {
+      type: 'line',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        onClick: (evt, elements) => {
+          if (!elements || !elements.length) return;
+          const p = _comparePoints[elements[0].index];
+          if (!p) return;
+          toggleCompareSelection(p.key, !compareSelection.has(p.key));
+        },
+        scales: {
+          x: {
+            grid: { color: chartTheme.gridColor },
+            ticks: {
+              autoSkip: false,
+              maxRotation: 90,
+              minRotation: 45,
+              font: { size: 9 },
+              callback: function (val, index) { return showTick[index] ? labels[index] : ''; }
+            }
+          },
+          y: {
+            grid: { color: chartTheme.gridColor },
+            title: { display: true, text: '圈速 (秒)', color: chartTheme.text }
+          }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { color: chartTheme.text, boxWidth: 14, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                if (!items.length) return '';
+                const p = _comparePoints[items[0].dataIndex];
+                return p ? (p.driver + ' · 第 ' + p.lap + ' 圈') : '';
+              },
+              label: (ctx) => {
+                const p = _comparePoints[ctx.dataIndex];
+                return '圈速 ' + ctx.parsed.y + 's' + (p && p.startTime ? ' · ' + p.startTime : '');
+              }
+            }
+          }
+        }
+      }
+    });
+  }, 50);
+}
+
+function updateCompareChartSelection() {
+  const chart = window._compareSelectChart;
+  if (chart) chart.update();
 }
 
 async function runComparison() {
@@ -1096,11 +1588,59 @@ async function runComparison() {
   }
 
   html += '</tbody></table></div>' +
-    '<div style="font-size:0.62rem;color:var(--text2);margin-top:8px;">* 标注为手动设定的车辆参数 · 绿色=与第一列不同</div>' +
+    '<div style="font-size:0.62rem;color:var(--text2);margin-top:8px;">* 标注为手动设定的车辆参数 · 绿色=与第一列不同</div>';
+
+  // Export buttons
+  html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">' +
+    '<button class="btn btn-secondary btn-sm" onclick="exportCompareMD()">📝 导出 Markdown</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="exportCompareCSV()">📊 导出 CSV</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ 打印</button>' +
     '</div>';
+
+  // Tire temp chart (if data exists)
+  const hasTireData = selected.some(x => x.log.pre_flTempMid || x.log.post_flTempMid);
+  if (hasTireData) {
+    html += '<div class="card" style="margin-top:16px;">' +
+      '<div class="card-title"><span class="dot"></span>胎温对比 (中温)</div>' +
+      '<div class="chart-wrap" style="min-height:300px;"><canvas id="chartCompareTire"></canvas></div>' +
+      '</div>';
+  }
+
+  html += '</div>';
 
   document.getElementById('compareResult').innerHTML = html;
   document.getElementById('compareResult').scrollIntoView({ behavior: 'smooth' });
+
+  // Render charts after DOM update
+  if (hasTireData) renderCompareCharts(selected);
+}
+
+function renderCompareCharts(selected) {
+  setTimeout(() => {
+    initChartDefaults();
+    destroyCharts();
+    const ch = window._charts = {};
+
+    // Tire temp pre vs post (grouped bar)
+    const tireCanvas = document.getElementById('chartCompareTire');
+    if (tireCanvas) {
+      const corners = ['FL', 'FR', 'RL', 'RR'];
+      const colorPalette = [chartTheme.accent, chartTheme.green, chartTheme.yellow, chartTheme.blue, chartTheme.purple];
+      const datasets = [];
+      selected.forEach((x, i) => {
+        const preData = corners.map(c => parseFloat(x.log['pre_' + c.toLowerCase() + 'TempMid']) || 0);
+        const postData = corners.map(c => parseFloat(x.log['post_' + c.toLowerCase() + 'TempMid']) || 0);
+        const color = colorPalette[i % colorPalette.length];
+        datasets.push({ label: (x.log.driver || '#' + (i+1)) + ' 前', data: preData, backgroundColor: color + '66', borderColor: color, borderWidth: 1 });
+        datasets.push({ label: (x.log.driver || '#' + (i+1)) + ' 后', data: postData, backgroundColor: color + 'CC', borderColor: color, borderWidth: 1, borderDash: [4,2] });
+      });
+      ch.compareTire = new Chart(tireCanvas, {
+        type: 'bar',
+        data: { labels: corners, datasets },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { grid: { color: chartTheme.gridColor }, title: { display: true, text: '温度 °C', color: chartTheme.text } } } }
+      });
+    }
+  }, 50);
 }
 
 // ============================================================
@@ -1115,6 +1655,168 @@ function fmtDate(iso) {
 
 function exportAllCSV() {
   showToast('请在浏览页面选择会话后导出（功能待扩展）');
+}
+
+// ============================================================
+// Export
+// ============================================================
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob(['﻿' + content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportCompareMD() {
+  const table = document.querySelector('#compareResult .compare-table');
+  if (!table) { showToast('没有对比结果可导出'); return; }
+  const rows = table.querySelectorAll('tr');
+  const headers = [];
+  rows[0].querySelectorAll('th').forEach(th => headers.push(th.textContent.trim()));
+  const bodyRows = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].querySelectorAll('td');
+    bodyRows.push(Array.from(cells).map(td => td.textContent.trim()));
+  }
+  let md = '# TestRide 对比报告\n\n**生成时间:** ' + new Date().toLocaleString('zh-CN') + '\n\n';
+  md += '| ' + headers.join(' | ') + ' |\n|' + headers.map(() => '---').join('|') + '|\n';
+  bodyRows.forEach(r => { md += '| ' + r.join(' | ') + ' |\n'; });
+  md += '\n---\n*由 TestRide Admin 生成*\n';
+  downloadFile(md, 'TestRide_Compare_' + new Date().toISOString().slice(0,10) + '.md', 'text/markdown');
+  showToast('✅ 已导出 Markdown');
+}
+
+function exportCompareCSV() {
+  const table = document.querySelector('#compareResult .compare-table');
+  if (!table) { showToast('没有对比结果可导出'); return; }
+  const rows = table.querySelectorAll('tr');
+  const csvRows = [];
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('th, td');
+    csvRows.push(Array.from(cells).map(c => '"' + c.textContent.trim().replace(/"/g,'""') + '"').join(','));
+  });
+  downloadFile(csvRows.join('\n'), 'TestRide_Compare_' + new Date().toISOString().slice(0,10) + '.csv', 'text/csv');
+  showToast('✅ 已导出 CSV');
+}
+
+function exportDashboardMD() {
+  const sessions = dataStore.sessions;
+  const totalLogs = sessions.reduce((s, ses) => s + ses.logs.length, 0);
+  const drivers = new Set();
+  const testItems = new Set();
+  const allLaps = [];
+  sessions.forEach(s => s.logs.forEach(l => {
+    if (l.driver) drivers.add(l.driver);
+    if (l.testItems) testItems.add(l.testItems);
+    (l.lapTimes || []).forEach(t => { const v = parseFloat(t); if (!isNaN(v)) allLaps.push(v); });
+  }));
+
+  let md = '# TestRide 数据概览报告\n\n**生成时间:** ' + new Date().toLocaleString('zh-CN') + '\n\n## 基本统计\n\n';
+  md += '| 指标 | 数值 |\n|---|---|\n';
+  md += '| 导入会话数 | ' + sessions.length + ' |\n';
+  md += '| 日志总数 | ' + totalLogs + ' |\n';
+  md += '| 不同车手数 | ' + drivers.size + ' |\n';
+  md += '| 测试项目类型数 | ' + testItems.size + ' |\n';
+
+  if (allLaps.length) {
+    const sorted = allLaps.sort((a,b) => a - b);
+    md += '| 圈速记录数 | ' + allLaps.length + ' |\n';
+    md += '| 最佳圈速 | ' + sorted[0].toFixed(2) + ' |\n';
+    md += '| 平均圈速 | ' + (sorted.reduce((a,b)=>a+b,0) / sorted.length).toFixed(2) + ' |\n';
+  }
+
+  md += '\n## 车手最佳圈速\n\n| 车手 | 最佳圈速 |\n|---|---|\n';
+  const driverBests = {};
+  sessions.forEach(s => s.logs.forEach(l => {
+    if (!l.driver) return;
+    const best = (l.lapTimes || []).map(Number).filter(v => !isNaN(v)).sort((a,b)=>a-b)[0];
+    if (best != null && (!driverBests[l.driver] || best < driverBests[l.driver])) driverBests[l.driver] = best;
+  }));
+  Object.entries(driverBests).sort((a,b) => a[1] - b[1]).forEach(([d, b]) => {
+    md += '| ' + d + ' | ' + (b != null ? b.toFixed(2) : '-') + ' |\n';
+  });
+  md += '\n---\n*由 TestRide Admin 生成*\n';
+  downloadFile(md, 'TestRide_Report_' + new Date().toISOString().slice(0,10) + '.md', 'text/markdown');
+  showToast('✅ 已导出统计报告');
+}
+
+// ============================================================
+// Chart.js — Theme & Lifecycle
+// ============================================================
+const chartTheme = {
+  bg: '#0a0a0a',
+  border: '#2a2a2a',
+  text: '#909090',
+  accent: '#cc0000',
+  green: '#22c55e',
+  yellow: '#eab308',
+  blue: '#3b82f6',
+  purple: '#a855f7',
+  gridColor: 'rgba(255,255,255,0.06)',
+  fontFamily: "'Segoe UI','Microsoft YaHei',system-ui,sans-serif"
+};
+
+// Set Chart.js global defaults after library loads
+function initChartDefaults() {
+  if (typeof Chart === 'undefined') return;
+  Chart.defaults.color = chartTheme.text;
+  Chart.defaults.borderColor = chartTheme.border;
+  Chart.defaults.font.family = chartTheme.fontFamily;
+  Chart.defaults.plugins.tooltip.backgroundColor = '#1a1a1a';
+  Chart.defaults.plugins.tooltip.borderColor = chartTheme.border;
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+}
+
+function destroyCharts() {
+  Object.values(window._charts || {}).forEach(c => { try { c.destroy(); } catch(e) {} });
+  window._charts = {};
+}
+
+function renderDashboardCharts() {
+  initChartDefaults();
+  destroyCharts();
+  const ch = window._charts = {};
+  const sessions = dataStore.sessions;
+  if (!sessions.length) return;
+
+  // Test Type Distribution (Doughnut) — click a slice to jump to compare
+  const typeCount = {};
+  sessions.forEach(s => s.logs.forEach(l => {
+    const t = l.testItems || '(未分类)';
+    typeCount[t] = (typeCount[t] || 0) + 1;
+  }));
+  const typeLabels = Object.keys(typeCount);
+  if (typeLabels.length) {
+    const canvas = document.getElementById('chartTestType');
+    if (canvas) {
+      ch.testType = new Chart(canvas, {
+        type: 'doughnut',
+        data: { labels: typeLabels, datasets: [{ data: typeLabels.map(t => typeCount[t]), backgroundColor: ['#3b82f6','#22c55e','#eab308','#a855f7','#f97316','#14b8a6','#ec4899','#8b5cf6'], borderColor: chartTheme.bg, borderWidth: 2, hoverOffset: 22 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          onClick: (evt, elements) => {
+            if (!elements || !elements.length) return;
+            jumpToCompareByTestItem(typeLabels[elements[0].index]);
+          },
+          plugins: { legend: { position: 'bottom', labels: { color: chartTheme.text, padding: 16, font: { size: 11 } } } }
+        }
+      });
+    }
+  }
+}
+
+// Click a test-type slice → select its logs and jump to compare page
+function jumpToCompareByTestItem(testItem) {
+  if (!testItem) return;
+  _compareTestItemFilter = testItem;
+  compareSelection.clear();
+  document.getElementById('compareResult').innerHTML = '';
+  switchView('compare');
 }
 
 // ============================================================
