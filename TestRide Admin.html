@@ -551,6 +551,7 @@ function csvToSessions(rows) {
       frontToe: g('前轮Toe'), rearToe: g('后轮Toe'),
       frontPressure: g('前轮胎压psi'), rearPressure: g('后轮胎压psi'),
       frontSpringRate: g('前悬弹簧N/mm'), rearSpringRate: g('后悬弹簧N/mm'),
+      frontRideHeight: g('前轴离地间隙mm'), rearRideHeight: g('后轴离地间隙mm'),
       frontDamper: { hsComp: g('前HSC'), hsReb: g('前HSR'), lsComp: g('前LSC'), lsReb: g('前LSR') },
       rearDamper: { hsComp: g('后HSC'), hsReb: g('后HSR'), lsComp: g('后LSC'), lsReb: g('后LSR') },
       arbSetting: g('ARB档位'),
@@ -586,6 +587,8 @@ function csvToSessions(rows) {
         post_rlPressure: v('测试后_RL胎压psi'), post_rrPressure: v('测试后_RR胎压psi'),
         post_rlTempOuter: v('测试后_RL胎温外°C'), post_rlTempMid: v('测试后_RL胎温中°C'), post_rlTempInner: v('测试后_RL胎温内°C'),
         post_rrTempOuter: v('测试后_RR胎温外°C'), post_rrTempMid: v('测试后_RR胎温中°C'), post_rrTempInner: v('测试后_RR胎温内°C'),
+        pre_hvVoltage: v('测试前高压电池电压V'), pre_lvVoltage: v('测试前低压电池电压V'),
+        post_hvVoltage: v('测试后高压电池电压V'), post_lvVoltage: v('测试后低压电池电压V'),
         lapTimes: lapStr ? lapStr.split(';').map(s => s.trim()).filter(Boolean) : [],
         notes: v('备注'),
         attachments: [],
@@ -1030,6 +1033,7 @@ async function showSessionDetail(sessionId) {
             '<tr><td style="color:var(--text2);">后Toe</td><td>' + esc(sv('rearToe')) + '°</td></tr>' +
             '<tr><td style="color:var(--text2);">胎压 F/R</td><td>' + esc(sv('frontPressure')) + ' / ' + esc(sv('rearPressure')) + ' psi</td></tr>' +
             '<tr><td style="color:var(--text2);">弹簧 F/R</td><td>' + esc(sv('frontSpringRate')) + ' / ' + esc(sv('rearSpringRate')) + ' N/mm</td></tr>' +
+            '<tr><td style="color:var(--text2);">离地间隙 F/R</td><td>' + esc(sv('frontRideHeight')) + ' / ' + esc(sv('rearRideHeight')) + ' mm</td></tr>' +
             '<tr><td style="color:var(--text2);">ARB</td><td>' + esc(sv('arbSetting')) + '</td></tr>' +
           '</table>' +
         '</div>' +
@@ -1116,6 +1120,8 @@ async function showLogDetail(sessionId, logId) {
             '<tr><td style="color:var(--text2);">地面状态</td><td>' + esc(log.surfaceCondition) + '</td></tr>' +
             '<tr><td style="color:var(--text2);">Rot 1/2/3</td><td>' + esc(log.rot1) + ' / ' + esc(log.rot2) + ' / ' + esc(log.rot3) + '</td></tr>' +
             '<tr><td style="color:var(--text2);">TC / REG</td><td>' + esc(log.tc) + ' / ' + esc(log.reg) + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">电池电压 前</td><td>' + (log.pre_hvVoltage || log.pre_lvVoltage ? 'HV ' + esc(log.pre_hvVoltage) + 'V / LV ' + esc(log.pre_lvVoltage) + 'V' : '—') + '</td></tr>' +
+            '<tr><td style="color:var(--text2);">电池电压 后</td><td>' + (log.post_hvVoltage || log.post_lvVoltage ? 'HV ' + esc(log.post_hvVoltage) + 'V / LV ' + esc(log.post_lvVoltage) + 'V' : '—') + '</td></tr>' +
             '<tr><td style="color:var(--text2);">最佳圈速</td><td style="font-weight:700;color:var(--accent);">' + esc(bestLap) + '</td></tr>' +
             '<tr><td style="color:var(--text2);">机械更改</td><td>' + esc(log.mechanicalChanges || '无') + '</td></tr>' +
             '<tr><td style="color:var(--text2);">备注</td><td>' + esc(log.notes || '无') + '</td></tr>' +
