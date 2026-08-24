@@ -783,6 +783,8 @@ function getEmptyLog() {
     post_rlPressure: '', post_rrPressure: '',
     post_rlTempOuter: '', post_rlTempMid: '', post_rlTempInner: '',
     post_rrTempOuter: '', post_rrTempMid: '', post_rrTempInner: '',
+    // Battery voltage
+    pre_hvVoltage: '', pre_lvVoltage: '', post_hvVoltage: '', post_lvVoltage: '',
     lapTimes: [],
     notes: '',
     attachments: []
@@ -836,6 +838,8 @@ function getEmptySetup() {
     rearPressure: '',
     frontSpringRate: '',
     rearSpringRate: '',
+    frontRideHeight: '',
+    rearRideHeight: '',
     frontDamper: { hsComp: '', hsReb: '', lsComp: '', lsReb: '' },
     rearDamper: { hsComp: '', hsReb: '', lsComp: '', lsReb: '' },
     arbSetting: '',
@@ -1178,6 +1182,16 @@ function renderSetupPage() {
         </div>
         <div></div>
       </div>
+      <div class="form-row cols-2" style="margin-top:16px;">
+        <div class="form-group">
+          <label>前轴离地间隙 Front Ride Height<span class="unit"> mm</span></label>
+          <input type="number" name="frontRideHeight" value="${v('frontRideHeight')}" step="1" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>后轴离地间隙 Rear Ride Height<span class="unit"> mm</span></label>
+          <input type="number" name="rearRideHeight" value="${v('rearRideHeight')}" step="1" placeholder="0">
+        </div>
+      </div>
       <div style="margin-top:16px;">
         <div style="font-size:0.78rem;font-weight:700;color:#fff;margin-bottom:12px;text-transform:uppercase;letter-spacing:1px;">阻尼档位 Damper Settings</div>
         <div class="damper-section">
@@ -1269,7 +1283,8 @@ function autoSaveSetup() {
   if (!form) return;
 
   const simpleFields = ['vcuVersion','tireType','tireNumber','frontCamber','rearCamber',
-    'frontToe','rearToe','frontPressure','rearPressure','frontSpringRate','rearSpringRate','arbSetting'];
+    'frontToe','rearToe','frontPressure','rearPressure','frontSpringRate','rearSpringRate',
+    'frontRideHeight','rearRideHeight','arbSetting'];
   for (const f of simpleFields) {
     const el = form.querySelector(`[name="${f}"]`);
     if (el) setup[f] = el.value;
@@ -1520,6 +1535,29 @@ function renderLogForm(log) {
     <div class="form-group">
       <label>🔧 机械参数更改 Mechanical Changes</label>
       <textarea name="mechanicalChanges" rows="5" placeholder="记录本次测试前进行的调整">${v('mechanicalChanges')}</textarea>
+    </div>
+  </div>
+
+  <!-- ===== 电池电压 ===== -->
+  <div class="form-card">
+    <div class="section-title"><span class="dot"></span>电池电压 Battery Voltage</div>
+    <div class="form-row cols-2">
+      <div class="form-group">
+        <label>测试前高压电池电压 Pre HV<span class="unit"> V</span></label>
+        <input type="number" name="pre_hvVoltage" value="${v('pre_hvVoltage')}" step="0.1" placeholder="0.0">
+      </div>
+      <div class="form-group">
+        <label>测试前低压电池电压 Pre LV<span class="unit"> V</span></label>
+        <input type="number" name="pre_lvVoltage" value="${v('pre_lvVoltage')}" step="0.1" placeholder="0.0">
+      </div>
+      <div class="form-group">
+        <label>测试后高压电池电压 Post HV<span class="unit"> V</span></label>
+        <input type="number" name="post_hvVoltage" value="${v('post_hvVoltage')}" step="0.1" placeholder="0.0">
+      </div>
+      <div class="form-group">
+        <label>测试后低压电池电压 Post LV<span class="unit"> V</span></label>
+        <input type="number" name="post_lvVoltage" value="${v('post_lvVoltage')}" step="0.1" placeholder="0.0">
+      </div>
     </div>
   </div>
 
@@ -2097,9 +2135,10 @@ function autoSave() {
     'post_rlTempOuter','post_rlTempMid','post_rlTempInner',
     'post_rrTempOuter','post_rrTempMid','post_rrTempInner'
   ];
+  const batteryFields = ['pre_hvVoltage','pre_lvVoltage','post_hvVoltage','post_lvVoltage'];
 
   let changed = false;
-  for (const f of [...simpleFields, ...hiddenFields, ...tireFields]) {
+  for (const f of [...simpleFields, ...hiddenFields, ...tireFields, ...batteryFields]) {
     const el = form.querySelector(`[name="${f}"]`);
     if (el && log[f] !== el.value) { log[f] = el.value; changed = true; }
   }
@@ -2206,6 +2245,7 @@ function exportSessionCSV_internal(session) {
     'RL胎深P1','RL胎深P2','RL胎深P3','RR胎深P1','RR胎深P2','RR胎深P3',
     '前轮Camber','后轮Camber','前轮Toe','后轮Toe',
     '前轮胎压psi','后轮胎压psi','前悬弹簧N/mm','后悬弹簧N/mm',
+    '前轴离地间隙mm','后轴离地间隙mm',
     '前HSC','前HSR','前LSC','前LSR','后HSC','后HSR','后LSC','后LSR',
     'ARB档位','调校备注',
     // Log fields
@@ -2220,6 +2260,7 @@ function exportSessionCSV_internal(session) {
     '测试后_FR胎温外°C','测试后_FR胎温中°C','测试后_FR胎温内°C',
     '测试后_RL胎压psi','测试后_RR胎压psi','测试后_RL胎温外°C','测试后_RL胎温中°C','测试后_RL胎温内°C',
     '测试后_RR胎温外°C','测试后_RR胎温中°C','测试后_RR胎温内°C',
+    '测试前高压电池电压V','测试前低压电池电压V','测试后高压电池电压V','测试后低压电池电压V',
     '圈速列表','备注','附件数量','附件文件名'
   ];
 
@@ -2232,6 +2273,7 @@ function exportSessionCSV_internal(session) {
     tdv('rr','p1'), tdv('rr','p2'), tdv('rr','p3'),
     sv('frontCamber'), sv('rearCamber'), sv('frontToe'), sv('rearToe'),
     sv('frontPressure'), sv('rearPressure'), sv('frontSpringRate'), sv('rearSpringRate'),
+    sv('frontRideHeight'), sv('rearRideHeight'),
     dmpv('frontDamper','hsComp'), dmpv('frontDamper','hsReb'), dmpv('frontDamper','lsComp'), dmpv('frontDamper','lsReb'),
     dmpv('rearDamper','hsComp'), dmpv('rearDamper','hsReb'), dmpv('rearDamper','lsComp'), dmpv('rearDamper','lsReb'),
     sv('arbSetting'), sv('notes'),
@@ -2247,6 +2289,7 @@ function exportSessionCSV_internal(session) {
     l.post_frTempOuter, l.post_frTempMid, l.post_frTempInner,
     l.post_rlPressure, l.post_rrPressure, l.post_rlTempOuter, l.post_rlTempMid, l.post_rlTempInner,
     l.post_rrTempOuter, l.post_rrTempMid, l.post_rrTempInner,
+    l.pre_hvVoltage, l.pre_lvVoltage, l.post_hvVoltage, l.post_lvVoltage,
     (l.lapTimes||[]).join('; '), l.notes,
     (l.attachments||[]).length, (l.attachments||[]).map(a => a.name).join('; ')
   ].map(c => '"' + String(c||'').replace(/"/g,'""') + '"'));
